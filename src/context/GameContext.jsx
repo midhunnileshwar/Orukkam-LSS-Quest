@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db, googleProvider, PhoneAuthProvider } from '../services/firebase';
+import { auth, db, googleProvider } from '../services/firebase';
 import {
   signInWithPopup,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
   onAuthStateChanged,
   signOut
 } from "firebase/auth";
@@ -77,40 +75,6 @@ export const GameProvider = ({ children }) => {
       return { success: true, user: result.user };
     } catch (error) {
       console.error("Google Login Error", error);
-      return { success: false, message: error.message };
-    }
-  };
-
-  const setupRecaptcha = (elementId) => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
-        'size': 'invisible',
-        'callback': () => {
-          // reCAPTCHA solved
-        }
-      });
-    }
-  };
-
-  const loginWithPhone = async (phoneNumber) => {
-    try {
-      // Ensure phone number has country code, e.g., +91
-      const appVerifier = window.recaptchaVerifier;
-      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      window.confirmationResult = confirmationResult;
-      return { success: true };
-    } catch (error) {
-      console.error("Phone Login Error", error);
-      return { success: false, message: error.message };
-    }
-  };
-
-  const verifyOtp = async (otp) => {
-    try {
-      const result = await window.confirmationResult.confirm(otp);
-      return { success: true, user: result.user };
-    } catch (error) {
-      console.error("OTP Error", error);
       return { success: false, message: error.message };
     }
   };
@@ -196,9 +160,6 @@ export const GameProvider = ({ children }) => {
         completeLevel,
         getLevelStatus,
         loginWithGoogle,
-        loginWithPhone,
-        verifyOtp,
-        setupRecaptcha,
         logout,
         saveProfile,
         setAvatar // Kept for compatibility, though saveProfile is preferred

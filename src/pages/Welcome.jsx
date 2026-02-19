@@ -13,15 +13,7 @@ export default function Welcome() {
 
   const [showLogin, setShowLogin] = useState(false);
   const [showTeacherAuth, setShowTeacherAuth] = useState(false);
-  const [loginMethod, setLoginMethod] = useState(null); // 'google' | 'phone'
   const [loading, setLoading] = useState(false);
-  const [districts, setDistricts] = useState([
-    'Kasaragod',
-    'Kannur',
-    'Wayanad',
-    'Kozhikode',
-    'Malappuram',
-  ]); // Mock list
 
   // Secret Teacher Mode Trigger
   const [logoPressTimer, setLogoPressTimer] = useState(null);
@@ -57,19 +49,6 @@ export default function Welcome() {
 
     setShowLogin(true);
   };
-
-  /* --- CHANGED: Added recaptcha-container */
-  useEffect(() => {
-    if (loginMethod === 'phone') {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        // We need to pass the ID of the element
-        // setupRecaptcha is now available in context? 
-        // We'll assume we need to call it here or inside the context's loginWithPhone if it's auto-handled.
-        // Actually, the context's setupRecaptcha needs to be called with the ID.
-      }, 500);
-    }
-  }, [loginMethod]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -109,10 +88,6 @@ export default function Welcome() {
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               className="cursor-pointer"
             >
-              {/* 
-                          Using a text placeholder for logo if image fails, 
-                          but typically we'd use the img tag here.
-                        */}
               <h1
                 className="text-8xl font-black text-white drop-shadow-[0_5px_5px_rgba(0,0,0,0.3)] tracking-tight stroke-black"
                 style={{ WebkitTextStroke: '2px #4B5563' }}
@@ -152,45 +127,27 @@ export default function Welcome() {
                 exit={{ y: 200, opacity: 0 }}
                 className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl p-6 absolute bottom-0 pb-12"
               >
-                {!loginMethod ? (
-                  // --- CHOICE SCREEN ---
-                  <>
-                    <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
-                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6">
-                      ആരുവാ ഇത്? (Who is this?)
-                    </h2>
+                {/* --- GOOGLE LOGIN ONLY --- */}
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+                <h2 className="text-2xl font-black text-slate-700 text-center mb-6">
+                  ആരുവാ ഇത്? (Who is this?)
+                </h2>
 
-                    <button
-                      onClick={handleGoogleLogin}
-                      disabled={loading}
-                      className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-4 px-6 rounded-2xl flex items-center justify-center space-x-3 mb-4 transition-all active:scale-95 relative overflow-hidden"
-                    >
-                      <span className="text-2xl">Gw</span>
-                      <span>Google വഴി തുടങ്ങാം</span>
-                    </button>
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-4 px-6 rounded-2xl flex items-center justify-center space-x-3 mb-4 transition-all active:scale-95 relative overflow-hidden"
+                >
+                  <span className="text-2xl">Gw</span>
+                  <span>Google വഴി തുടങ്ങാം</span>
+                </button>
 
-                    <button
-                      onClick={() => setLoginMethod('phone')}
-                      className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-4 px-6 rounded-2xl flex items-center justify-center space-x-3 mb-4 transition-all active:scale-95"
-                    >
-                      <span>📱</span>
-                      <span>മൊബൈൽ നമ്പർ ഉപയോഗിക്കാം</span>
-                    </button>
-
-                    <button
-                      className="w-full text-slate-400 font-bold py-2"
-                      onClick={() => setShowLogin(false)}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  // --- PHONE LOGIN SCREEN ---
-                  <PhoneLogin
-                    onBack={() => setLoginMethod(null)}
-                    onSuccess={() => setShowLogin(false)}
-                  />
-                )}
+                <button
+                  className="w-full text-slate-400 font-bold py-2"
+                  onClick={() => setShowLogin(false)}
+                >
+                  Cancel
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -203,116 +160,6 @@ export default function Welcome() {
         />
       </Background>
     </React.Fragment>
-  );
-}
-
-// Helper Component for Phone Login Flow
-function PhoneLogin({ onBack, onSuccess }) {
-  const navigate = useNavigate();
-  const { loginWithPhone, verifyOtp, setupRecaptcha } = useGame(); // Added setupRecaptcha
-
-  const [step, setStep] = useState(1); // 1: Phone, 2: OTP
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    // Initialize Recaptcha when component mounts
-    setupRecaptcha('recaptcha-container');
-  }, [setupRecaptcha]);
-
-  const handleSendOtp = async () => {
-    setLoading(true);
-    setError('');
-    const res = await loginWithPhone(phone); // Expects full number e.g. +91...
-    setLoading(false);
-    if (res.success) {
-      setStep(2);
-    } else {
-      setError(res.message);
-    }
-  };
-
-  const handleVerify = async () => {
-    setLoading(true);
-    setError('');
-    const res = await verifyOtp(otp); // Changed sig
-    setLoading(false);
-    if (res.success) {
-      onSuccess();
-      // Check if new user
-      if (res.user.isNew) {
-        navigate('/setup');
-      } else {
-        navigate('/map');
-      }
-    } else {
-      setError(res.message);
-    }
-  };
-
-  return (
-    <div className="w-full">
-      <button onClick={onBack} className="text-sm font-bold text-slate-400 mb-4">
-        ← Back
-      </button>
-
-      {/* Hidden container for reCAPTCHA */}
-      <div id="recaptcha-container"></div>
-
-      {step === 1 ? (
-        <>
-          <h3 className="text-xl font-bold text-slate-800 mb-4">Enter Mobile Number</h3>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+91 9876543210"
-            className="w-full p-4 rounded-xl border-2 border-slate-200 text-xl font-bold mb-4 outline-none focus:border-green-500"
-          />
-          {error && <p className="text-red-500 font-bold mb-2">{error}</p>}
-          <button
-            onClick={handleSendOtp}
-            disabled={loading || phone.length < 10}
-            className="w-full bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50"
-          >
-            {loading ? 'Sending...' : 'Get OTP'}
-          </button>
-        </>
-      ) : (
-        <>
-          <h3 className="text-xl font-bold text-slate-800 mb-4">Enter OTP</h3>
-          <p className="text-sm text-slate-500 mb-4">Sent to {phone}</p>
-          <div className="flex justify-center space-x-2 mb-6">
-            {[0, 1, 2, 3].map((i) => (
-              <input
-                key={i}
-                type="text"
-                maxLength="1"
-                value={otp[i] || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const newOtp = otp.split('');
-                  newOtp[i] = val;
-                  setOtp(newOtp.join(''));
-                  // Auto focus next logic could go here
-                }}
-                className="w-12 h-12 border-2 border-slate-300 rounded-lg text-center text-xl font-bold focus:border-green-500 outline-none"
-              />
-            ))}
-          </div>
-          {error && <p className="text-red-500 font-bold mb-2 text-center">{error}</p>}
-          <button
-            onClick={handleVerify}
-            disabled={loading || otp.length < 4}
-            className="w-full bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50"
-          >
-            {loading ? 'Verifying...' : 'Verify & Login'}
-          </button>
-        </>
-      )}
-    </div>
   );
 }
 
