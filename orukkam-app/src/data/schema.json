@@ -1,0 +1,24 @@
+{
+  "landId": "maths",
+  "levels": [
+    {
+      "id": 1,
+      "title": "Level 1: Addition",
+      "type": "multiple-choice",
+      "questions": [
+        {
+          "id": "q1",
+          "text": "2 + 2 = ?",
+          "options": [
+            { "id": "a", "text": "3" },
+            { "id": "b", "text": "4" },
+            { "id": "c", "text": "5" },
+            { "id": "d", "text": "6" }
+          ],
+          "correctOption": "b",
+          "explanation": "2 plus 2 equals 4."
+        }
+      ]
+    }
+  ]
+}
