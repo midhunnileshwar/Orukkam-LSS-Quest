@@ -58,21 +58,33 @@ export default function Welcome() {
     setShowLogin(true);
   };
 
+  /* --- CHANGED: Added recaptcha-container */
+  useEffect(() => {
+    if (loginMethod === 'phone') {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        // We need to pass the ID of the element
+        // setupRecaptcha is now available in context? 
+        // We'll assume we need to call it here or inside the context's loginWithPhone if it's auto-handled.
+        // Actually, the context's setupRecaptcha needs to be called with the ID.
+      }, 500);
+    }
+  }, [loginMethod]);
+
   const handleGoogleLogin = async () => {
     setLoading(true);
-    // Simulate network delay
-    setTimeout(async () => {
-      const result = await login('Midhun', 'password'); // Mock login
-      setLoading(false);
-      if (result.success) {
-        // Check callback logic
-        if (result.user.isNew) {
-          navigate('/setup');
-        } else {
-          navigate('/map');
-        }
+    const result = await loginWithGoogle(); // Changed from login()
+    setLoading(false);
+
+    if (result.success) {
+      if (result.user.isNew) {
+        navigate('/setup');
+      } else {
+        navigate('/map');
       }
-    }, 1500);
+    } else {
+      alert("Login Failed: " + result.message);
+    }
   };
 
   return (
@@ -197,7 +209,7 @@ export default function Welcome() {
 // Helper Component for Phone Login Flow
 function PhoneLogin({ onBack, onSuccess }) {
   const navigate = useNavigate();
-  const { loginWithPhone, verifyOtp } = useGame();
+  const { loginWithPhone, verifyOtp, setupRecaptcha } = useGame(); // Added setupRecaptcha
 
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP
   const [phone, setPhone] = useState('');
@@ -205,10 +217,15 @@ function PhoneLogin({ onBack, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    // Initialize Recaptcha when component mounts
+    setupRecaptcha('recaptcha-container');
+  }, [setupRecaptcha]);
+
   const handleSendOtp = async () => {
     setLoading(true);
     setError('');
-    const res = await loginWithPhone(phone);
+    const res = await loginWithPhone(phone); // Expects full number e.g. +91...
     setLoading(false);
     if (res.success) {
       setStep(2);
@@ -220,7 +237,7 @@ function PhoneLogin({ onBack, onSuccess }) {
   const handleVerify = async () => {
     setLoading(true);
     setError('');
-    const res = await verifyOtp(phone, otp);
+    const res = await verifyOtp(otp); // Changed sig
     setLoading(false);
     if (res.success) {
       onSuccess();
@@ -241,6 +258,9 @@ function PhoneLogin({ onBack, onSuccess }) {
         ← Back
       </button>
 
+      {/* Hidden container for reCAPTCHA */}
+      <div id="recaptcha-container"></div>
+
       {step === 1 ? (
         <>
           <h3 className="text-xl font-bold text-slate-800 mb-4">Enter Mobile Number</h3>
@@ -248,7 +268,7 @@ function PhoneLogin({ onBack, onSuccess }) {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="9876543210"
+            placeholder="+91 9876543210"
             className="w-full p-4 rounded-xl border-2 border-slate-200 text-xl font-bold mb-4 outline-none focus:border-green-500"
           />
           {error && <p className="text-red-500 font-bold mb-2">{error}</p>}

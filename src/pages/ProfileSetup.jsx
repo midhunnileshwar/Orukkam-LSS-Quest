@@ -31,10 +31,10 @@ const DISTRICTS = [
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
-  const { setAvatar, setUser } = useGame();
+  const { saveProfile, user } = useGame(); // Changed from setAvatar, setUser
 
   const [step, setStep] = useState(1); // 1: Name, 2: Avatar, 3: District
-  const [name, setName] = useState('');
+  const [name, setName] = useState(user?.displayName || ''); // Pre-fill from Google if available
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState('');
 
@@ -62,10 +62,14 @@ export default function ProfileSetup() {
     }
   };
 
-  const handleFinish = () => {
-    // Save profile
-    setUser({ name, district: selectedDistrict });
-    setAvatar(selectedAvatar);
+  const handleFinish = async () => {
+    // Save profile to Firestore
+    await saveProfile({
+      name,
+      district: selectedDistrict,
+      avatar: selectedAvatar,
+      isNew: false
+    });
 
     // Celebration
     confetti({
@@ -122,11 +126,10 @@ export default function ProfileSetup() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setSelectedAvatar(avi.id)}
-                  className={`p-6 rounded-3xl border-4 ${
-                    selectedAvatar === avi.id
+                  className={`p-6 rounded-3xl border-4 ${selectedAvatar === avi.id
                       ? 'border-yellow-400 bg-white/20'
                       : 'border-white/30 bg-white/10'
-                  } backdrop-blur-md transition-all`}
+                    } backdrop-blur-md transition-all`}
                 >
                   <div className="text-6xl mb-2">{avi.emoji}</div>
                   <div className="font-bold text-xl">{avi.name}</div>
@@ -145,11 +148,10 @@ export default function ProfileSetup() {
                 <div
                   key={dist}
                   onClick={() => setSelectedDistrict(dist)}
-                  className={`p-4 rounded-xl mb-2 font-bold text-lg cursor-pointer transition-colors ${
-                    selectedDistrict === dist
+                  className={`p-4 rounded-xl mb-2 font-bold text-lg cursor-pointer transition-colors ${selectedDistrict === dist
                       ? 'bg-purple-600 text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-purple-100'
-                  }`}
+                    }`}
                 >
                   {dist}
                 </div>

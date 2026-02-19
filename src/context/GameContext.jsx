@@ -1,116 +1,180 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockServer } from '../services/mockServer';
+import { auth, db, googleProvider, PhoneAuthProvider } from '../services/firebase';
+import {
+  signInWithPopup,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  onAuthStateChanged,
+  signOut
+} from "firebase/auth";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  onSnapshot
+} from "firebase/firestore";
 
 const GameContext = createContext();
 
 export const useGame = () => useContext(GameContext);
 
 export const GameProvider = ({ children }) => {
-  // Load from local storage or default
-  const [xp, setXp] = useState(() => parseInt(localStorage.getItem('orukkam_xp')) || 0);
-  const [hearts, setHearts] = useState(() => parseInt(localStorage.getItem('orukkam_hearts')) || 5);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Level Progress: { maths: { 1: 'completed', 2: 'current', 3: 'locked' } }
-  // Level Progress: { maths: { 1: 'completed', 2: 'current', 3: 'locked' } }
-  const [progress, setProgress] = useState(() => {
-    try {
-      const saved = localStorage.getItem('orukkam_progress');
-      return saved
-        ? JSON.parse(saved)
-        : {
-            maths: { 1: 'current', 2: 'locked', 3: 'locked', 4: 'locked' },
-            malayalam: { 1: 'current', 2: 'locked' },
-            english: { 1: 'current', 2: 'locked' },
-            evs: { 1: 'current', 2: 'locked' },
-            gk: { 1: 'current', 2: 'locked' },
-          };
-    } catch (e) {
-      console.error('Failed to parse progress', e);
-      return {
-        maths: { 1: 'current', 2: 'locked' },
-        malayalam: { 1: 'current', 2: 'locked' },
-        english: { 1: 'current', 2: 'locked' },
-        evs: { 1: 'current', 2: 'locked' },
-        gk: { 1: 'current', 2: 'locked' },
-      };
-    }
+  // Game State
+  const [xp, setXp] = useState(0);
+  const [hearts, setHearts] = useState(5);
+  const [avatar, setAvatar] = useState('boy');
+  const [progress, setProgress] = useState({
+    maths: { 1: 'current', 2: 'locked', 3: 'locked', 4: 'locked' },
+    malayalam: { 1: 'current', 2: 'locked' },
+    english: { 1: 'current', 2: 'locked' },
+    evs: { 1: 'current', 2: 'locked' },
+    gk: { 1: 'current', 2: 'locked' },
   });
 
-  // Avatar State
-  const [avatar, setAvatar] = useState(() => localStorage.getItem('orukkam_avatar') || 'boy');
-
-  // Auth State
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('orukkam_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  // Persist
+  // Listen for Auth Changes & Realtime DB Updates
   useEffect(() => {
-    localStorage.setItem('orukkam_xp', xp);
-    localStorage.setItem('orukkam_hearts', hearts);
-    localStorage.setItem('orukkam_progress', JSON.stringify(progress));
-    localStorage.setItem('orukkam_avatar', avatar);
-    if (user) {
-      localStorage.setItem('orukkam_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('orukkam_user');
-    }
-  }, [xp, hearts, progress, avatar, user]);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // User logged in, listen to their Firestore document
+        const userRef = doc(db, "users", currentUser.uid);
 
-  const login = async (username, password) => {
-    const result = await mockServer.login(username, password);
-    if (result.success) {
-      setUser(result.user);
-      // Optional: Set avatar from user profile if not set?
-      // setAvatar(result.user.avatar);
+        const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUser({ ...currentUser, ...data }); // Merge Auth + DB data
+            setXp(data.xp || 0);
+            setHearts(data.hearts || 5);
+            setAvatar(data.avatar || 'boy');
+            if (data.progress) setProgress(data.progress);
+          } else {
+            // New User (Doc doesn't exist yet) - ProfileSetup will handle creation
+            setUser({ ...currentUser, isNew: true });
+          }
+          setLoading(false);
+        });
+
+        return () => unsubscribeSnapshot();
+      } else {
+        // User logged out
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  // --- Actions ---
+
+  const loginWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // Check if new user doc exists handled in use effect
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error("Google Login Error", error);
+      return { success: false, message: error.message };
     }
-    return result;
+  };
+
+  const setupRecaptcha = (elementId) => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
+        'size': 'invisible',
+        'callback': () => {
+          // reCAPTCHA solved
+        }
+      });
+    }
   };
 
   const loginWithPhone = async (phoneNumber) => {
-    const result = await mockServer.loginWithPhone(phoneNumber);
-    return result;
-  };
-
-  const verifyOtp = async (phoneNumber, otp) => {
-    const result = await mockServer.verifyOtp(phoneNumber, otp);
-    if (result.success) {
-      setUser(result.user);
+    try {
+      // Ensure phone number has country code, e.g., +91
+      const appVerifier = window.recaptchaVerifier;
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      window.confirmationResult = confirmationResult;
+      return { success: true };
+    } catch (error) {
+      console.error("Phone Login Error", error);
+      return { success: false, message: error.message };
     }
-    return result;
   };
 
-  const logout = () => {
-    setUser(null);
-    mockServer.logActivity('LOGOUT', { username: user?.name });
+  const verifyOtp = async (otp) => {
+    try {
+      const result = await window.confirmationResult.confirm(otp);
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error("OTP Error", error);
+      return { success: false, message: error.message };
+    }
   };
 
-  const addXp = (amount) => setXp((prev) => prev + amount);
-  const loseHeart = () => setHearts((prev) => Math.max(0, prev - 1));
-  const refillHearts = () => setHearts(5);
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  // --- Database Updates ---
+
+  const saveProfile = async (profileData) => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await setDoc(userRef, {
+      ...profileData,
+      xp,
+      hearts,
+      progress,
+      createdAt: new Date()
+    }, { merge: true });
+
+    // Update local state immediately to reflect changes
+    setAvatar(profileData.avatar);
+  };
+
+  const updateGameState = async (updates) => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, "users", auth.currentUser.uid);
+    await updateDoc(userRef, updates);
+  };
+
+  const addXp = (amount) => {
+    const newXp = xp + amount;
+    setXp(newXp);
+    updateGameState({ xp: newXp });
+  };
+
+  const loseHeart = () => {
+    const newHearts = Math.max(0, hearts - 1);
+    setHearts(newHearts);
+    updateGameState({ hearts: newHearts });
+  };
+
+  const refillHearts = () => {
+    setHearts(5);
+    updateGameState({ hearts: 5 });
+  };
 
   const completeLevel = (landId, levelId) => {
-    setProgress((prev) => {
-      const landProgress = { ...prev[landId] };
-      landProgress[levelId] = 'completed';
+    const newProgress = { ...progress };
+    const landProgress = { ...newProgress[landId] };
+    landProgress[levelId] = 'completed';
 
-      // Unlock next level
-      const nextLevel = parseInt(levelId) + 1;
-      if (landProgress[nextLevel]) {
-        // If defined in schema (to be added)
-        // Don't overwrite if already completed
-        if (landProgress[nextLevel] === 'locked') {
-          landProgress[nextLevel] = 'current';
-        }
-      } else {
-        // Just unlock it effectively if not pre-defined
-        landProgress[nextLevel] = 'current';
-      }
+    // Unlock next level
+    const nextLevel = parseInt(levelId) + 1;
+    // Simple logic: just unlock next ID
+    landProgress[nextLevel] = 'current';
 
-      return { ...prev, [landId]: landProgress };
-    });
-    addXp(50); // Bonus for completion
+    newProgress[landId] = landProgress;
+    setProgress(newProgress);
+
+    // Update DB
+    updateGameState({ progress: newProgress });
+    addXp(50);
   };
 
   const getLevelStatus = (landId, levelId) => {
@@ -120,25 +184,27 @@ export const GameProvider = ({ children }) => {
   return (
     <GameContext.Provider
       value={{
+        user,
+        loading,
         xp,
         hearts,
+        avatar,
+        progress,
         addXp,
         loseHeart,
         refillHearts,
         completeLevel,
         getLevelStatus,
-        progress, // Expose full object for Map calculation
-        avatar,
-        setAvatar,
-        user,
-        setUser,
-        login,
+        loginWithGoogle,
         loginWithPhone,
         verifyOtp,
+        setupRecaptcha,
         logout,
+        saveProfile,
+        setAvatar // Kept for compatibility, though saveProfile is preferred
       }}
     >
-      {children}
+      {!loading && children}
     </GameContext.Provider>
   );
 };
