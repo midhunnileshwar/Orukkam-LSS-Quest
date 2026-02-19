@@ -176,14 +176,13 @@ export default function Welcome() {
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
 
-            <TeacherAuth
-                isOpen={showTeacherAuth}
-                onClose={() => setShowTeacherAuth(false)}
-                onSuccess={handleTeacherSuccess}
-            />
-        </Background>
+                <TeacherAuth
+                    isOpen={showTeacherAuth}
+                    onClose={() => setShowTeacherAuth(false)}
+                    onSuccess={handleTeacherSuccess}
+                />
+            </Background>
         </React.Fragment >
     );
 }
