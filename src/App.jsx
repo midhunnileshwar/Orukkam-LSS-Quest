@@ -19,7 +19,7 @@ function App() {
     <GameProvider>
       <SoundProvider>
         <ErrorBoundary>
-          <Router>
+          <Router basename={import.meta.env.BASE_URL}>
             <div className="min-h-screen bg-orukkam-green/10 text-slate-900 font-sans">
               <Routes>
                 <Route path="/" element={<Welcome />} />

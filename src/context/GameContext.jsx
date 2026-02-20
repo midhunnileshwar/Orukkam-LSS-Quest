@@ -35,35 +35,55 @@ export const GameProvider = ({ children }) => {
 
   // Listen for Auth Changes & Realtime DB Updates
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // User logged in, listen to their Firestore document
-        const userRef = doc(db, "users", currentUser.uid);
+    let unsubscribeAuth;
+    // Safety timeout to prevent infinite blank screen
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Auth listener timed out, forcing app load");
+      setLoading(false);
+    }, 3000);
 
-        const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setUser({ ...currentUser, ...data }); // Merge Auth + DB data
-            setXp(data.xp || 0);
-            setHearts(data.hearts || 5);
-            setAvatar(data.avatar || 'boy');
-            if (data.progress) setProgress(data.progress);
-          } else {
-            // New User (Doc doesn't exist yet) - ProfileSetup will handle creation
-            setUser({ ...currentUser, isNew: true });
-          }
+    try {
+      unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+        clearTimeout(safetyTimeout);
+        if (currentUser) {
+          // User logged in, listen to their Firestore document
+          const userRef = doc(db, "users", currentUser.uid);
+
+          const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              setUser({ ...currentUser, ...data }); // Merge Auth + DB data
+              setXp(data.xp || 0);
+              setHearts(data.hearts || 5);
+              setAvatar(data.avatar || 'boy');
+              if (data.progress) setProgress(data.progress);
+            } else {
+              // New User (Doc doesn't exist yet) - ProfileSetup will handle creation
+              setUser({ ...currentUser, isNew: true });
+            }
+            setLoading(false);
+          }, (error) => {
+            console.error("Firestore snapshot error:", error);
+            setLoading(false); // Ensure we don't hang on error
+          });
+
+          return () => unsubscribeSnapshot();
+        } else {
+          // User logged out
+          setUser(null);
           setLoading(false);
-        });
+        }
+      });
+    } catch (error) {
+      console.error("Auth initialization error:", error);
+      clearTimeout(safetyTimeout);
+      setLoading(false);
+    }
 
-        return () => unsubscribeSnapshot();
-      } else {
-        // User logged out
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   // --- Actions ---
