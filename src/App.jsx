@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import HomeMap from './pages/HomeMap';
 import LandView from './pages/LandView';
 import QuizGame from './pages/QuizGame';
@@ -19,7 +19,7 @@ function App() {
     <GameProvider>
       <SoundProvider>
         <ErrorBoundary>
-          <Router basename={import.meta.env.BASE_URL}>
+          <Router>
             <div className="min-h-screen bg-orukkam-green/10 text-slate-900 font-sans">
               <Routes>
                 <Route path="/" element={<Welcome />} />
