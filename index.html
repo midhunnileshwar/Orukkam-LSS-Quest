@@ -11,6 +11,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+Chettan+2:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <title>Orukkam - LSS Quest</title>
+  <script>
+    window.addEventListener('error', function(event) {
+      document.body.innerHTML = '<div style="color: #b91c1c; padding: 20px; font-family: monospace; background: white; margin: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">' + 
+        '<h2 style="margin-top: 0;">Initialization Error 🚨</h2>' +
+        '<p style="font-size: 16px;"><strong>Error:</strong> ' + event.message + '</p>' +
+        '<p style="color: #4b5563;">This usually happens when environment variables (like Firebase config) are missing in Vercel settings.</p>' +
+        '<pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto;">' + (event.error && event.error.stack ? event.error.stack : '') + '</pre>' +
+        '</div>';
+    });
+  </script>
 </head>
 
 <body>
