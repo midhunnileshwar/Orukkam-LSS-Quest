@@ -86,15 +86,60 @@ export const GameProvider = ({ children }) => {
     };
   }, []);
 
-  // --- Actions ---
+  // --- Auth Actions ---
 
   const loginWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // Check if new user doc exists handled in use effect
       return { success: true, user: result.user };
     } catch (error) {
-      console.error("Google Login Error", error);
+      console.warn("Popup blocked or failed, attempting redirect...", error);
+      if (error.code === 'auth/popup-blocked' || error.message.includes('Cross-Origin')) {
+        try {
+          // Fallback to redirect if popup fails
+          await import('firebase/auth').then(({ signInWithRedirect }) => {
+            return signInWithRedirect(auth, googleProvider);
+          });
+          // Redirect won't return here immediately, it reloads the page
+          return { success: true, pendingRedirect: true };
+        } catch (redirectErr) {
+          console.error("Google Redirect Error", redirectErr);
+          return { success: false, message: redirectErr.message };
+        }
+      }
+      return { success: false, message: error.message };
+    }
+  };
+
+  const playAsGuest = async () => {
+    try {
+      const { signInAnonymously } = await import('firebase/auth');
+      const result = await signInAnonymously(auth);
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error("Guest Login Error", error);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const registerWithEmail = async (email, password) => {
+    try {
+      const { createUserWithEmailAndPassword } = await import('firebase/auth');
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error("Registration Error", error);
+      return { success: false, message: error.message };
+    }
+  };
+
+  const loginWithEmail = async (email, password) => {
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error("Email Login Error", error);
       return { success: false, message: error.message };
     }
   };
@@ -180,6 +225,9 @@ export const GameProvider = ({ children }) => {
         completeLevel,
         getLevelStatus,
         loginWithGoogle,
+        playAsGuest,
+        registerWithEmail,
+        loginWithEmail,
         logout,
         saveProfile,
         setAvatar // Kept for compatibility, though saveProfile is preferred

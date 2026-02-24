@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, PhoneAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, PhoneAuthProvider, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithRedirect } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
