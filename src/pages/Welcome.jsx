@@ -52,9 +52,20 @@ export default function Welcome() {
       colors: ['#FFD700', '#FF69B4', '#00BFFF'],
     });
 
-    setShowLogin(true);
-    setAuthMode('choose');
-    setAuthError(null);
+    // Disable login feature, auto-login as guest
+    executeAuth(playAsGuest);
+  };
+
+  const getFriendlyErrorMessage = (errorMsg) => {
+    if (!errorMsg) return "An unknown error occurred.";
+    if (errorMsg.includes('auth/invalid-email')) return "Please enter a valid email address. (ശരിയായ ഇമെയിൽ നൽകുക)";
+    if (errorMsg.includes('auth/email-already-in-use')) return "This email is already registered. Try logging in.";
+    if (errorMsg.includes('auth/weak-password')) return "Password must be at least 6 characters long.";
+    if (errorMsg.includes('auth/wrong-password') || errorMsg.includes('auth/invalid-credential') || errorMsg.includes('auth/user-not-found')) {
+      return "Incorrect email or password. (തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ്)";
+    }
+    if (errorMsg.includes('auth/popup-closed-by-user')) return "Sign-in was cancelled.";
+    return "Login Failed. Please try again.";
   };
 
   const executeAuth = async (authFunction, ...args) => {
@@ -74,7 +85,7 @@ export default function Welcome() {
         navigate('/map');
       }
     } else {
-      setAuthError(result.message);
+      setAuthError(getFriendlyErrorMessage(result.message));
     }
   };
 
@@ -238,7 +249,10 @@ export default function Welcome() {
                         {authMode === 'email-register' ? 'ഏற்கனவே അക്കൗണ്ട് ഉണ്ടോ? ' : 'പുതിയ ആളാണോ? '}
                       </span>
                       <button
-                        onClick={() => setAuthMode(authMode === 'email-register' ? 'email-login' : 'email-register')}
+                        onClick={() => {
+                          setAuthMode(authMode === 'email-register' ? 'email-login' : 'email-register');
+                          setAuthError(null);
+                        }}
                         className="text-candy-blue font-bold hover:underline"
                       >
                         {authMode === 'email-register' ? 'ലോഗിൻ ചെയ്യുക' : 'രജിസ്റ്റർ ചെയ്യുക'}
@@ -252,6 +266,7 @@ export default function Welcome() {
                   onClick={() => {
                     if (authMode !== 'choose') {
                       setAuthMode('choose');
+                      setAuthError(null);
                     } else {
                       setShowLogin(false);
                     }
