@@ -6,6 +6,7 @@ import GearButton from '../components/GearButton';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
 import { getQuestionsForLevel } from '../data/questions';
+import confetti from 'canvas-confetti';
 
 export default function QuizGame() {
   const { landId, levelId } = useParams();
@@ -24,6 +25,10 @@ export default function QuizGame() {
   const [isLevelComplete, setIsLevelComplete] = useState(false);
   const [completed, setCompleted] = useState(false);
 
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [fastAnswerBonus, setFastAnswerBonus] = useState(false);
+  const [earnedXp, setEarnedXp] = useState(0);
+
   // Create isDaily flag (derived from levelId or other logic)
   const isDaily = levelId === 'daily';
 
@@ -31,6 +36,14 @@ export default function QuizGame() {
     const data = getQuestionsForLevel(landId, levelId);
     setLevelData(data);
   }, [landId, levelId]);
+
+  useEffect(() => {
+    if (!levelData?.questions?.[currentQuestionIndex] || selectedOption || completed || showExplanation) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation]);
 
   const currentQuestion = levelData?.questions?.[currentQuestionIndex];
 
@@ -89,34 +102,27 @@ export default function QuizGame() {
     setIsCorrect(correct);
     setResult(correct ? 'correct' : 'wrong'); // Set result for styling
 
-    setTimeout(() => {
-      if (correct) {
-        playSound('correct');
-        addXp(10); // Add XP for correct answer
-        // The original code had a `handleCorrect` function that called `confetti` and then `nextQuestion`.
-        // For now, we'll directly call `nextQuestion` after a delay.
-        // Confetti logic will need to be re-integrated if desired.
-        setTimeout(() => {
-          nextQuestion();
-        }, 500); // Short delay before moving to next question
-      } else {
+    if (correct) {
+      playSound('correct');
+      const isFast = timeLeft >= 25; // Answered within 5 seconds
+      const xpAmount = isFast ? 15 : 10;
+      setEarnedXp(xpAmount);
+      setFastAnswerBonus(isFast);
+      addXp(xpAmount); // Add XP for correct answer
+
+      confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#4ade80', '#fbbf24', '#60a5fa'] });
+
+      setTimeout(() => {
+        nextQuestion();
+      }, 2000); // 2 second delay to show animations before moving to next question
+    } else {
+      setTimeout(() => {
         playSound('wrong');
         loseHeart();
-        setTimeout(() => setShowExplanation(true), 1000); // Show explanation for wrong answer
-      }
-    }, 1500); // Wait for gear spin animation
+        setShowExplanation(true); // Show explanation for wrong answer
+      }, 500);
+    }
   };
-
-  // The original handleCorrect and handleWrong functions are now largely integrated into handleOptionClick
-  // and nextQuestion. Keeping them commented out or removing them depends on future refactoring.
-  // const handleCorrect = () => {
-  //     setResult('correct');
-  //     confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#ff0000', '#00ff00', '#0000ff'] });
-
-  //     setTimeout(() => {
-  //         nextQuestion();
-  //     }, 2000);
-  // };
 
   // const handleWrong = () => {
   //     setResult('wrong');
@@ -129,6 +135,9 @@ export default function QuizGame() {
     setIsCorrect(null);
     setShowExplanation(false);
     setResult(null); // Reset result state
+    setFastAnswerBonus(false);
+    setEarnedXp(0);
+    setTimeLeft(30);
 
     if (currentQuestionIndex < levelData.questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -136,6 +145,7 @@ export default function QuizGame() {
       // Level Finished
       playSound('levelUp');
       setCompleted(true);
+      confetti({ particleCount: 300, spread: 160, origin: { y: 0.4 }, colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'] });
       updateLevelStatus(landId, parseInt(levelId), 'completed');
       // Add extra bonus for full level?
     }
@@ -170,6 +180,12 @@ export default function QuizGame() {
             />
           ))}
         </div>
+
+        {/* Timer UI */}
+        <div className={`font-mono text-2xl font-black px-4 py-2 rounded-full border-2 border-white/50 shadow-cartoon transition-colors ${timeLeft <= 5 ? 'bg-candy-red text-white animate-pulse' : 'bg-candy-blue text-white'}`}>
+          ⏳ {timeLeft}s
+        </div>
+
         <div className="bg-candy-green text-white px-4 py-2 rounded-full font-black text-lg shadow-cartoon border-2 border-white/50">
           {currentQuestionIndex + 1}/{levelData?.questions?.length || 0}
         </div>
@@ -216,7 +232,7 @@ export default function QuizGame() {
         </div>
 
         {/* Options Grid */}
-        <div className="grid grid-cols-2 gap-8 w-full place-items-center">
+        <div className="grid grid-cols-2 gap-8 w-full place-items-center relative">
           {currentQuestion.options.map((option) => (
             <GearButton
               key={option.id}
@@ -228,6 +244,31 @@ export default function QuizGame() {
               disabled={!!selectedOption}
             />
           ))}
+
+          {/* Floating Action Animations */}
+          <AnimatePresence>
+            {selectedOption && isCorrect && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5, y: 50 }}
+                animate={{ opacity: 1, scale: 1, y: -50 }}
+                exit={{ opacity: 0, y: -100 }}
+                transition={{ duration: 0.8, type: 'spring' }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center z-50"
+              >
+                <div className="text-6xl mb-2 animate-bounce">🌟</div>
+                <div className="bg-white/90 backdrop-blur-sm px-6 py-3 rounded-full border-4 border-candy-yellow shadow-2xl flex flex-col items-center">
+                  {fastAnswerBonus && (
+                    <span className="text-candy-red font-black text-xl animate-pulse mb-1">
+                      ⚡ FAST ANSWER!
+                    </span>
+                  )}
+                  <span className="text-candy-green font-black text-3xl">
+                    +{earnedXp} XP!
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
