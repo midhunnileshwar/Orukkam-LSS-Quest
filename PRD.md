@@ -1,4 +1,4 @@
-# Orukkam - LSS Quest: Product Requirements Document (Revamped)
+# Orukkam - CM Kids Quest: Product Requirements Document (Revamped)
 
 ## 1. Core Philosophy: "Kids First, Butter Smooth"
 **Goal:** Create an app that feels like a high-quality game, not a homework tool.
@@ -96,7 +96,7 @@
 3.  **Audio:** SoundPool for UI sounds (clicks, pops) to ensure zero latency. ExoPlayer for background music (soft, looping Lo-Fi beat).
 4.  **Database:** Room DB. Everything must work offline.
 
-## 6. LSS Content Plan (Syllabus)
+## 6. CM Kids Quest Content Plan (Syllabus)
 *   **Malayalam:** Padyam, Artham, Paryayam.
 *   **English:** Grammar, Comprehension.
 *   **Maths:** Mental Maths, Patterns.

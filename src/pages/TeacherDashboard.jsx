@@ -44,7 +44,7 @@ export default function TeacherDashboard() {
           </div>
           <div>
             <h1 className="font-bold text-white text-lg">Control Room</h1>
-            <p className="text-xs text-slate-400">Orukkam Admin</p>
+            <p className="text-xs text-slate-400">Orukkam - CM Kids Quest Admin</p>
           </div>
         </div>
         <button
@@ -61,22 +61,20 @@ export default function TeacherDashboard() {
         <nav className="space-y-2">
           <button
             onClick={() => setActiveTab('magic-sheet')}
-            className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all ${
-              activeTab === 'magic-sheet'
+            className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all ${activeTab === 'magic-sheet'
                 ? 'bg-indigo-600 text-white shadow-lg'
                 : 'hover:bg-slate-800 text-slate-400'
-            }`}
+              }`}
           >
             <FileSpreadsheet size={20} />
             <span className="font-bold">Magic Sheet</span>
           </button>
           <button
             onClick={() => setActiveTab('smart-paste')}
-            className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all ${
-              activeTab === 'smart-paste'
+            className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all ${activeTab === 'smart-paste'
                 ? 'bg-indigo-600 text-white shadow-lg'
                 : 'hover:bg-slate-800 text-slate-400'
-            }`}
+              }`}
           >
             <FileText size={20} />
             <span className="font-bold">Smart Paste</span>

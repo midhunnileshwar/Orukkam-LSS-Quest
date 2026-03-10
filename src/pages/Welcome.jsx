@@ -134,7 +134,7 @@ export default function Welcome() {
               </h1>
             </motion.div>
             <div className="mt-4 bg-white/90 px-6 py-2 rounded-full shadow-lg border-2 border-white transform -rotate-2">
-              <p className="text-xl font-bold text-slate-600">LSS വിജയത്തിലേക്കുള്ള ആദ്യ ചുവട്</p>
+              <p className="text-xl font-bold text-slate-600">CM Kids Quest വിജയത്തിലേക്കുള്ള ആദ്യ ചുവട്</p>
             </div>
           </motion.div>
 
