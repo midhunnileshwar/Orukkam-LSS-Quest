@@ -118,7 +118,7 @@ export default function Welcome() {
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', bounce: 0.5 }}
-            className="mb-10 text-center"
+            className="mb-8 text-center flex flex-col items-center"
             onMouseDown={handleLogoPressStart}
             onMouseUp={handleLogoPressEnd}
             onTouchStart={handleLogoPressStart}
@@ -128,14 +128,13 @@ export default function Welcome() {
             <motion.div
               animate={{ y: [0, -10, 0] }}
               transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-              className="cursor-pointer"
+              className="cursor-pointer flex flex-col items-center"
             >
-              <h1
-                className="text-7xl sm:text-8xl font-black text-white drop-shadow-[0_6px_6px_rgba(0,0,0,0.35)] tracking-tight font-chembakam"
-                style={{ WebkitTextStroke: '2px #1e293b' }}
-              >
-                ഒരുക്കം
-              </h1>
+              <img
+                src="./logo.png"
+                alt="ഒരുക്കം - CM Kids Quest"
+                className="w-48 sm:w-60 md:w-72 h-auto drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform"
+              />
             </motion.div>
             <div className="mt-3 bg-white/95 px-6 py-2 rounded-full shadow-lg border-2 border-white transform -rotate-1">
               <p className="text-base sm:text-lg font-black text-slate-700 font-chembakam">

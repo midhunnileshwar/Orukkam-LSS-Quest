@@ -40,7 +40,10 @@ export default function TeacherAuth({ isOpen, onClose, onSuccess }) {
             className="bg-slate-900 text-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-700"
           >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-300">Teacher Access</h2>
+              <div className="flex items-center space-x-2">
+                <img src="./logo.png" alt="Orukkam Logo" className="w-8 h-8 object-contain" />
+                <h2 className="text-xl font-bold text-slate-300">Teacher Access</h2>
+              </div>
               <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full">
                 <X size={24} />
               </button>

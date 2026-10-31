@@ -41,7 +41,12 @@ export default function Profile() {
         <h1 className="text-2xl sm:text-3xl font-black text-candy-purple font-chembakam">
           എന്റെ പ്രൊഫൈൽ (Profile)
         </h1>
-        <div className="w-12 h-12" />
+        <img
+          src="./logo.png"
+          alt="ഒരുക്കം Logo"
+          onClick={() => navigate('/map')}
+          className="w-12 h-12 object-contain cursor-pointer hover:scale-105 transition-transform"
+        />
       </div>
 
       {/* Profile Card */}

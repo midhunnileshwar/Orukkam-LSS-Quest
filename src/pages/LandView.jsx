@@ -58,20 +58,28 @@ export default function LandView() {
   return (
     <div className={`min-h-screen ${theme.bg} flex flex-col`}>
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/90 glass-panel m-4 px-4 py-3 shadow-cartoon flex items-center rounded-full border-4 border-white">
-        <button
+      <div className="sticky top-0 z-20 bg-white/90 glass-panel m-4 px-4 py-3 shadow-cartoon flex items-center justify-between rounded-full border-4 border-white">
+        <div className="flex items-center">
+          <button
+            onClick={() => navigate('/map')}
+            className="p-2 bg-slate-100 rounded-full mr-4 hover:bg-slate-200 transition"
+          >
+            <ArrowLeft size={28} className="text-slate-700" />
+          </button>
+          <h1
+            className={`font-black font-chembakam ${theme.accent} ${
+              landId === 'maths' ? 'text-xl' : 'text-2xl'
+            }`}
+          >
+            {theme.title}
+          </h1>
+        </div>
+        <img
+          src="./logo.png"
+          alt="ഒരുക്കം Logo"
           onClick={() => navigate('/map')}
-          className="p-2 bg-slate-100 rounded-full mr-4 hover:bg-slate-200 transition"
-        >
-          <ArrowLeft size={28} className="text-slate-700" />
-        </button>
-        <h1
-          className={`font-black font-chembakam ${theme.accent} ${
-            landId === 'maths' ? 'text-xl' : 'text-2xl'
-          }`}
-        >
-          {theme.title}
-        </h1>
+          className="w-10 h-10 object-contain cursor-pointer hover:scale-105 transition-transform"
+        />
       </div>
 
       {/* The Scrollable Path */}
