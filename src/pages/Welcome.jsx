@@ -10,7 +10,7 @@ import TeacherAuth from '../components/TeacherAuth';
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { loginWithGoogle, playAsGuest, registerWithEmail, loginWithEmail } = useGame();
+  const { loginWithGoogle, playAsGuest, registerWithEmail, loginWithEmail, isRegistered } = useGame();
   const { playSound, speakText } = useSound();
 
   const [showLogin, setShowLogin] = useState(false);
@@ -51,6 +51,14 @@ export default function Welcome() {
     });
 
     speakText('ഒരുക്കം ക്വസ്റ്റിലേക്ക് സ്വാഗതം!');
+
+    // If device already registered, go straight to the game map!
+    if (isRegistered) {
+      navigate('/map');
+      return;
+    }
+
+    // First time player: proceed to setup
     executeAuth(playAsGuest);
   };
 
@@ -76,10 +84,10 @@ export default function Welcome() {
       if (result.pendingRedirect) {
         return;
       }
-      if (result.user?.isNew || result.user?.isAnonymous) {
-        navigate('/setup');
-      } else {
+      if (isRegistered) {
         navigate('/map');
+      } else {
+        navigate('/setup');
       }
     } else {
       setAuthError(getFriendlyErrorMessage(result.message));
@@ -153,7 +161,7 @@ export default function Welcome() {
                   <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping pointer-events-none" />
                   <Play size={76} fill="white" className="text-white ml-2 drop-shadow-md" />
                   <span className="absolute -bottom-14 text-xl sm:text-2xl font-black text-slate-800 bg-white/95 px-5 py-1.5 rounded-2xl shadow-cartoon font-malayalam">
-                    കളിക്കാം! (START)
+                    {isRegistered ? 'തുടരാം! (CONTINUE)' : 'കളിക്കാം! (START)'}
                   </span>
                 </motion.button>
 

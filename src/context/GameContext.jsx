@@ -24,9 +24,11 @@ const DEFAULT_PROGRESS = {
   gk: { 1: 'current', 2: 'locked', 3: 'locked' },
 };
 
+const STORAGE_KEY = 'orukkam_game_state';
+
 const getLocalState = () => {
   try {
-    const saved = localStorage.getItem('orukkam_game_state');
+    const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : null;
   } catch {
     return null;
@@ -39,8 +41,9 @@ export const GameProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Student Identity (Stored Strictly Locally on Device per DPDP Act Section 9)
-  const [name, setName] = useState(localData.name || 'കുട്ടി');
+  // Student Identity & Device Registration
+  const [isRegistered, setIsRegistered] = useState(Boolean(localData.isRegistered));
+  const [name, setName] = useState(localData.name || '');
   const [district, setDistrict] = useState(localData.district || 'Kannur');
   const [parentName, setParentName] = useState(localData.parentName || '');
   const [parentConsent, setParentConsent] = useState(Boolean(localData.parentConsent));
@@ -51,10 +54,11 @@ export const GameProvider = ({ children }) => {
   const [avatar, setAvatar] = useState(localData.avatar || 'tiger');
   const [progress, setProgress] = useState(localData.progress || DEFAULT_PROGRESS);
 
-  // Sync state strictly to local storage
+  // Persist game state directly to this device's localStorage
   useEffect(() => {
     try {
       const stateToSave = {
+        isRegistered,
         name,
         district,
         parentName,
@@ -64,11 +68,11 @@ export const GameProvider = ({ children }) => {
         avatar,
         progress,
       };
-      localStorage.setItem('orukkam_game_state', JSON.stringify(stateToSave));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.warn('Could not save to localStorage', e);
     }
-  }, [name, district, parentName, parentConsent, xp, hearts, avatar, progress]);
+  }, [isRegistered, name, district, parentName, parentConsent, xp, hearts, avatar, progress]);
 
   // Auth & Cloud Sync (Only for verified Parents/Teachers)
   useEffect(() => {
@@ -90,7 +94,7 @@ export const GameProvider = ({ children }) => {
                 const data = docSnap.data();
                 setUser({ ...currentUser, ...data });
                 if (data.parentName) setParentName(data.parentName);
-                if (typeof data.xp === 'number') setXp(data.xp);
+                if (typeof data.xp === 'number' && data.xp > xp) setXp(data.xp);
                 if (typeof data.hearts === 'number') setHearts(data.hearts);
                 if (data.avatar) setAvatar(data.avatar);
                 if (data.progress) setProgress(data.progress);
@@ -175,24 +179,58 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // Logout clears session and resets device game data
   const logout = async () => {
     try {
       await signOut(auth);
     } catch {
       // ignore
     }
+    // Clear device state on explicit user logout
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+
     setUser(null);
+    setIsRegistered(false);
+    setName('');
+    setDistrict('Kannur');
+    setParentName('');
+    setParentConsent(false);
+    setXp(0);
+    setHearts(5);
+    setAvatar('tiger');
+    setProgress(DEFAULT_PROGRESS);
   };
 
-  // --- Profile Registration under DPDP Act / Kerala Cyber Protocol ---
-  // In compliance with India DPDP Act 2023 Sec 9: We do NOT send child PII to internet servers.
-  // Registration is verified by Parent/Guardian and stored locally on child's device.
+  // Save profile and lock in device registration
   const saveProfile = async (profileData) => {
+    setIsRegistered(true);
     if (profileData.name) setName(profileData.name);
     if (profileData.district) setDistrict(profileData.district);
     if (profileData.avatar) setAvatar(profileData.avatar);
     if (profileData.parentName) setParentName(profileData.parentName);
     if (profileData.parentConsent !== undefined) setParentConsent(profileData.parentConsent);
+
+    // Save strictly to local device storage immediately
+    try {
+      const updated = {
+        isRegistered: true,
+        name: profileData.name || name,
+        district: profileData.district || district,
+        parentName: profileData.parentName || parentName,
+        parentConsent: profileData.parentConsent !== undefined ? profileData.parentConsent : parentConsent,
+        avatar: profileData.avatar || avatar,
+        xp,
+        hearts,
+        progress,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
 
     // Save only anonymous telemetry/progress to cloud if parent logs in
     if (auth.currentUser) {
@@ -300,6 +338,7 @@ export const GameProvider = ({ children }) => {
       value={{
         user,
         loading,
+        isRegistered,
         name,
         setName,
         district,
