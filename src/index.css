@@ -2,11 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html, body {
+    margin: 0;
+    font-family: 'Anek Malayalam', 'Gayathri', 'Manjari', 'Nunito', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}
+
 body {
-  margin: 0;
-  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
   background-color: #fce7f3;
-  /* Light pink/purple base */
   background-image: radial-gradient(#fbcfe8 2px, transparent 2px);
   background-size: 32px 32px;
 }

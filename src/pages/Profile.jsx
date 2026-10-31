@@ -38,15 +38,10 @@ export default function Profile() {
         >
           <ArrowLeft size={28} className="text-slate-700" />
         </button>
-        <h1 className="text-2xl sm:text-3xl font-black text-candy-purple font-chembakam">
+        <h1 className="text-2xl sm:text-3xl font-black text-candy-purple font-malayalam">
           എന്റെ പ്രൊഫൈൽ (Profile)
         </h1>
-        <img
-          src="./logo.png"
-          alt="ഒരുക്കം Logo"
-          onClick={() => navigate('/map')}
-          className="w-12 h-12 object-contain cursor-pointer hover:scale-105 transition-transform"
-        />
+        <div className="w-12 h-12" />
       </div>
 
       {/* Profile Card */}

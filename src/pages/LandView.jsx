@@ -67,19 +67,13 @@ export default function LandView() {
             <ArrowLeft size={28} className="text-slate-700" />
           </button>
           <h1
-            className={`font-black font-chembakam ${theme.accent} ${
+            className={`font-black font-malayalam ${theme.accent} ${
               landId === 'maths' ? 'text-xl' : 'text-2xl'
             }`}
           >
             {theme.title}
           </h1>
         </div>
-        <img
-          src="./logo.png"
-          alt="ഒരുക്കം Logo"
-          onClick={() => navigate('/map')}
-          className="w-10 h-10 object-contain cursor-pointer hover:scale-105 transition-transform"
-        />
       </div>
 
       {/* The Scrollable Path */}

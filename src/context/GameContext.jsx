@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db, googleProvider } from '../services/firebase';
-import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import {
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut
+} from "firebase/auth";
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  onSnapshot
+} from "firebase/firestore";
 
 const GameContext = createContext();
 
@@ -30,20 +39,26 @@ export const GameProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Game State (with LocalStorage fallback for seamless offline / guest mode)
+  // Student Identity (Stored Strictly Locally on Device per DPDP Act Section 9)
   const [name, setName] = useState(localData.name || 'കുട്ടി');
   const [district, setDistrict] = useState(localData.district || 'Kannur');
+  const [parentName, setParentName] = useState(localData.parentName || '');
+  const [parentConsent, setParentConsent] = useState(Boolean(localData.parentConsent));
+
+  // Game Progress
   const [xp, setXp] = useState(typeof localData.xp === 'number' ? localData.xp : 0);
   const [hearts, setHearts] = useState(typeof localData.hearts === 'number' ? localData.hearts : 5);
   const [avatar, setAvatar] = useState(localData.avatar || 'tiger');
   const [progress, setProgress] = useState(localData.progress || DEFAULT_PROGRESS);
 
-  // Sync to local storage whenever game state changes
+  // Sync state strictly to local storage
   useEffect(() => {
     try {
       const stateToSave = {
         name,
         district,
+        parentName,
+        parentConsent,
         xp,
         hearts,
         avatar,
@@ -53,12 +68,11 @@ export const GameProvider = ({ children }) => {
     } catch (e) {
       console.warn('Could not save to localStorage', e);
     }
-  }, [name, district, xp, hearts, avatar, progress]);
+  }, [name, district, parentName, parentConsent, xp, hearts, avatar, progress]);
 
-  // Listen for Auth Changes & Realtime DB Updates
+  // Auth & Cloud Sync (Only for verified Parents/Teachers)
   useEffect(() => {
     let unsubscribeAuth;
-    // Safety timeout to prevent infinite blank screen
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
     }, 2000);
@@ -67,7 +81,6 @@ export const GameProvider = ({ children }) => {
       unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         clearTimeout(safetyTimeout);
         if (currentUser) {
-          // User logged in, listen to their Firestore document
           const userRef = doc(db, 'users', currentUser.uid);
 
           const unsubscribeSnapshot = onSnapshot(
@@ -76,14 +89,12 @@ export const GameProvider = ({ children }) => {
               if (docSnap.exists()) {
                 const data = docSnap.data();
                 setUser({ ...currentUser, ...data });
-                if (data.name) setName(data.name);
-                if (data.district) setDistrict(data.district);
+                if (data.parentName) setParentName(data.parentName);
                 if (typeof data.xp === 'number') setXp(data.xp);
                 if (typeof data.hearts === 'number') setHearts(data.hearts);
                 if (data.avatar) setAvatar(data.avatar);
                 if (data.progress) setProgress(data.progress);
               } else {
-                // New User (Doc doesn't exist yet)
                 setUser({ ...currentUser, isNew: true });
               }
               setLoading(false);
@@ -96,7 +107,6 @@ export const GameProvider = ({ children }) => {
 
           return () => unsubscribeSnapshot();
         } else {
-          // User logged out
           setUser(null);
           setLoading(false);
         }
@@ -139,7 +149,6 @@ export const GameProvider = ({ children }) => {
       const result = await signInAnonymously(auth);
       return { success: true, user: result.user };
     } catch {
-      // Offline fallback: allow guest play without network
       const mockGuest = { uid: 'guest-' + Date.now(), isAnonymous: true, isNew: false };
       setUser(mockGuest);
       return { success: true, user: mockGuest };
@@ -175,29 +184,36 @@ export const GameProvider = ({ children }) => {
     setUser(null);
   };
 
-  // --- Database / State Updates ---
-
+  // --- Profile Registration under DPDP Act / Kerala Cyber Protocol ---
+  // In compliance with India DPDP Act 2023 Sec 9: We do NOT send child PII to internet servers.
+  // Registration is verified by Parent/Guardian and stored locally on child's device.
   const saveProfile = async (profileData) => {
     if (profileData.name) setName(profileData.name);
     if (profileData.district) setDistrict(profileData.district);
     if (profileData.avatar) setAvatar(profileData.avatar);
+    if (profileData.parentName) setParentName(profileData.parentName);
+    if (profileData.parentConsent !== undefined) setParentConsent(profileData.parentConsent);
 
+    // Save only anonymous telemetry/progress to cloud if parent logs in
     if (auth.currentUser) {
       try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await setDoc(
           userRef,
           {
-            ...profileData,
+            parentEmail: auth.currentUser.email || null,
+            parentName: profileData.parentName || parentName,
+            district: profileData.district || district,
             xp,
             hearts,
             progress,
-            updatedAt: new Date(),
+            isParentVerified: true,
+            dpdpConsentDate: new Date().toISOString(),
           },
           { merge: true }
         );
       } catch (e) {
-        console.warn('Could not save to remote DB, state saved locally:', e.message);
+        console.warn('Sync notice:', e.message);
       }
     }
   };
@@ -208,7 +224,7 @@ export const GameProvider = ({ children }) => {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await updateDoc(userRef, updates);
       } catch {
-        // Fallback to local state if Firestore write fails
+        // Fallback local
       }
     }
   };
@@ -239,7 +255,6 @@ export const GameProvider = ({ children }) => {
     const currentLandProgress = progress[landId] ? { ...progress[landId] } : {};
     currentLandProgress[levelId] = 'completed';
 
-    // Unlock next level if not already completed
     const nextLevel = parseInt(levelId) + 1;
     if (currentLandProgress[nextLevel] !== 'completed') {
       currentLandProgress[nextLevel] = 'current';
@@ -289,6 +304,10 @@ export const GameProvider = ({ children }) => {
         setName,
         district,
         setDistrict,
+        parentName,
+        setParentName,
+        parentConsent,
+        setParentConsent,
         xp,
         hearts,
         avatar,

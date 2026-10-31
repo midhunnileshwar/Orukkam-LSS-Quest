@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
-import { Play } from 'lucide-react';
+import { Play, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Background from '../components/Background';
 import TeacherAuth from '../components/TeacherAuth';
@@ -22,7 +22,7 @@ export default function Welcome() {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
-  // Secret Teacher Mode Trigger (Long Press on Logo)
+  // Secret Teacher Mode Trigger (Long Press on Logo / Title)
   const [logoPressTimer, setLogoPressTimer] = useState(null);
   const handleLogoPressStart = () => {
     const timer = setTimeout(() => {
@@ -55,22 +55,15 @@ export default function Welcome() {
   };
 
   const getFriendlyErrorMessage = (errorMsg) => {
-    if (!errorMsg) return 'An unknown error occurred.';
-    if (errorMsg.includes('auth/invalid-email'))
-      return 'Please enter a valid email address. (ശരിയായ ഇമെയിൽ നൽകുക)';
-    if (errorMsg.includes('auth/email-already-in-use'))
-      return 'This email is already registered. Try logging in.';
-    if (errorMsg.includes('auth/weak-password'))
-      return 'Password must be at least 6 characters long.';
-    if (
-      errorMsg.includes('auth/wrong-password') ||
-      errorMsg.includes('auth/invalid-credential') ||
-      errorMsg.includes('auth/user-not-found')
-    ) {
-      return 'Incorrect email or password. (തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ്)';
+    if (!errorMsg) return "An unknown error occurred.";
+    if (errorMsg.includes('auth/invalid-email')) return "Please enter a valid email address. (ശരിയായ ഇമെയിൽ നൽകുക)";
+    if (errorMsg.includes('auth/email-already-in-use')) return "This email is already registered. Try logging in.";
+    if (errorMsg.includes('auth/weak-password')) return "Password must be at least 6 characters long.";
+    if (errorMsg.includes('auth/wrong-password') || errorMsg.includes('auth/invalid-credential') || errorMsg.includes('auth/user-not-found')) {
+      return "Incorrect email or password. (തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ്)";
     }
-    if (errorMsg.includes('auth/popup-closed-by-user')) return 'Sign-in was cancelled.';
-    return 'Login Failed. Please try again.';
+    if (errorMsg.includes('auth/popup-closed-by-user')) return "Sign-in was cancelled.";
+    return "Login Failed. Please try again.";
   };
 
   const executeAuth = async (authFunction, ...args) => {
@@ -98,7 +91,7 @@ export default function Welcome() {
 
   const handleEmailAction = () => {
     if (!email || !password) {
-      setAuthError('Please enter email and password.');
+      setAuthError("Please enter email and password.");
       return;
     }
     if (authMode === 'email-register') {
@@ -113,31 +106,31 @@ export default function Welcome() {
       <Background>
         {/* --- Main Content --- */}
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 select-none">
-          {/* Logo Section */}
+          {/* Title Section (Anek Malayalam Typography) */}
           <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: 'spring', bounce: 0.5 }}
-            className="mb-8 text-center flex flex-col items-center"
+            className="mb-8 text-center flex flex-col items-center cursor-pointer"
             onMouseDown={handleLogoPressStart}
             onMouseUp={handleLogoPressEnd}
             onTouchStart={handleLogoPressStart}
             onTouchEnd={handleLogoPressEnd}
-            title="അധ്യാപകർക്ക്: ലോഗോയിൽ 3 സെക്കൻഡ് അമർത്തിപ്പിടിക്കുക (Long press for Teacher Mode)"
+            title="അധ്യാപകർക്ക്: ടൈറ്റിലിൽ 3 സെക്കൻഡ് അമർത്തിപ്പിടിക്കുക (Long press for Teacher Mode)"
           >
             <motion.div
-              animate={{ y: [0, -10, 0] }}
+              animate={{ y: [0, -8, 0] }}
               transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-              className="cursor-pointer flex flex-col items-center"
             >
-              <img
-                src="./logo.png"
-                alt="ഒരുക്കം - CM Kids Quest"
-                className="w-48 sm:w-60 md:w-72 h-auto drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform"
-              />
+              <h1
+                className="text-7xl sm:text-8xl md:text-9xl font-extrabold text-white drop-shadow-[0_8px_12px_rgba(0,0,0,0.35)] tracking-normal font-malayalam"
+                style={{ WebkitTextStroke: '2px #1e293b' }}
+              >
+                ഒരുക്കം
+              </h1>
             </motion.div>
             <div className="mt-3 bg-white/95 px-6 py-2 rounded-full shadow-lg border-2 border-white transform -rotate-1">
-              <p className="text-base sm:text-lg font-black text-slate-700 font-chembakam">
+              <p className="text-base sm:text-lg font-black text-slate-800 font-malayalam">
                 CM Kids Quest • LSS വിജയത്തിലേക്കുള്ള ചുവട് 🚀
               </p>
             </div>
@@ -146,22 +139,32 @@ export default function Welcome() {
           {/* Start Button Area */}
           <AnimatePresence mode="wait">
             {!showLogin ? (
-              <motion.button
-                key="start-btn"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleStart}
-                className="group relative bg-gradient-to-b from-green-400 to-green-600 w-44 h-44 sm:w-48 sm:h-48 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,128,0,0.4)] border-4 border-white cursor-pointer"
-              >
-                <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping pointer-events-none" />
-                <Play size={76} fill="white" className="text-white ml-2 drop-shadow-md" />
-                <span className="absolute -bottom-14 text-xl sm:text-2xl font-black text-slate-800 bg-white/90 px-5 py-1.5 rounded-2xl shadow-cartoon">
-                  കളിക്കാം! (START)
-                </span>
-              </motion.button>
+              <div className="flex flex-col items-center">
+                <motion.button
+                  key="start-btn"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleStart}
+                  className="group relative bg-gradient-to-b from-green-400 to-green-600 w-44 h-44 sm:w-48 sm:h-48 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(0,128,0,0.4)] border-4 border-white cursor-pointer"
+                >
+                  <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping pointer-events-none" />
+                  <Play size={76} fill="white" className="text-white ml-2 drop-shadow-md" />
+                  <span className="absolute -bottom-14 text-xl sm:text-2xl font-black text-slate-800 bg-white/95 px-5 py-1.5 rounded-2xl shadow-cartoon font-malayalam">
+                    കളിക്കാം! (START)
+                  </span>
+                </motion.button>
+
+                {/* Kerala Cyber Safety Notice Badge */}
+                <div className="mt-20 max-w-sm bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-2xl border border-white shadow-md text-center flex items-center space-x-2">
+                  <ShieldCheck size={20} className="text-emerald-600 flex-shrink-0" />
+                  <p className="text-[11px] font-bold text-slate-700 leading-tight">
+                    DPDP Act 2023 & Kerala Cyber Safety അനുസരിച്ച് കുട്ടികളുടെ വിവരങ്ങൾ പൂർണ്ണമായി ഉപകരണത്തിൽ മാത്രം സുരക്ഷിതം.
+                  </p>
+                </div>
+              </div>
             ) : (
               <motion.div
                 key="login-panel"
@@ -180,7 +183,7 @@ export default function Welcome() {
 
                 {authMode === 'choose' ? (
                   <>
-                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-chembakam">
+                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-malayalam">
                       തുടങ്ങാം! (Let&apos;s Start!)
                     </h2>
 
@@ -189,14 +192,12 @@ export default function Welcome() {
                       disabled={loading}
                       className="w-full bg-candy-blue hover:bg-candy-blue/90 text-white font-bold py-4 px-6 rounded-2xl flex items-center justify-center mb-3 shadow-[0_6px_0_0_#2563eb] active:translate-y-1 active:shadow-none transition-all"
                     >
-                      <span className="text-xl">🚀 ലോഗിൻ ചെയ്യാതെ കളിക്കാം (Play as Guest)</span>
+                      <span className="text-xl font-malayalam">🚀 ലോഗിൻ ചെയ്യാതെ കളിക്കാം (Play as Guest)</span>
                     </button>
 
                     <div className="relative flex py-4 items-center">
                       <div className="flex-grow border-t border-slate-200"></div>
-                      <span className="flex-shrink-0 mx-4 text-slate-400 font-bold text-sm">
-                        അല്ലെങ്കിൽ (OR)
-                      </span>
+                      <span className="flex-shrink-0 mx-4 text-slate-400 font-bold text-sm">അല്ലെങ്കിൽ (OR)</span>
                       <div className="flex-grow border-t border-slate-200"></div>
                     </div>
 
@@ -205,31 +206,13 @@ export default function Welcome() {
                       disabled={loading}
                       className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-2xl flex items-center justify-center space-x-3 mb-3 transition-all"
                     >
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          fill="#4285F4"
-                        />
-                        <path
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          fill="#34A853"
-                        />
-                        <path
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          fill="#FBBC05"
-                        />
-                        <path
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          fill="#EA4335"
-                        />
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
-                      <span>Google വഴി</span>
+                      <span>Google വഴി (Parent Login)</span>
                     </button>
 
                     <button
@@ -237,18 +220,18 @@ export default function Welcome() {
                       disabled={loading}
                       className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-2xl mb-4 transition-all"
                     >
-                      📧 ഇമെയിൽ വഴി
+                      📧 രക്ഷിതാവിന്റെ ഇമെയിൽ വഴി
                     </button>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-chembakam">
-                      {authMode === 'email-register' ? 'പുതിയ അക്കൗണ്ട്' : 'ഇമെയിൽ ലോഗിൻ'}
+                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-malayalam">
+                      {authMode === 'email-register' ? 'രക്ഷിതാവിന്റെ പുതിയ അക്കൗണ്ട്' : 'ഇമെയിൽ ലോഗിൻ'}
                     </h2>
 
                     <input
                       type="email"
-                      placeholder="Email address"
+                      placeholder="Parent's email address"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full p-4 rounded-xl border-2 border-slate-200 text-lg font-bold mb-3 outline-none focus:border-candy-blue"
@@ -264,13 +247,9 @@ export default function Welcome() {
                     <button
                       onClick={handleEmailAction}
                       disabled={loading}
-                      className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-bold py-4 px-6 rounded-2xl mb-3 shadow-[0_6px_0_0_#16a34a] active:translate-y-1 active:shadow-none transition-all text-xl"
+                      className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-bold py-4 px-6 rounded-2xl mb-3 shadow-[0_6px_0_0_#16a34a] active:translate-y-1 active:shadow-none transition-all text-xl font-malayalam"
                     >
-                      {loading
-                        ? 'കാത്തിരിക്കൂ...'
-                        : authMode === 'email-register'
-                        ? 'രജിസ്റ്റർ ചെയ്യുക'
-                        : 'ലോഗിൻ ചെയ്യുക'}
+                      {loading ? 'കാത്തിരിക്കൂ...' : (authMode === 'email-register' ? 'രജിസ്റ്റർ ചെയ്യുക' : 'ലോഗിൻ ചെയ്യുക')}
                     </button>
 
                     <div className="text-center mt-4">
@@ -279,9 +258,7 @@ export default function Welcome() {
                       </span>
                       <button
                         onClick={() => {
-                          setAuthMode(
-                            authMode === 'email-register' ? 'email-login' : 'email-register'
-                          );
+                          setAuthMode(authMode === 'email-register' ? 'email-login' : 'email-register');
                           setAuthError(null);
                         }}
                         className="text-candy-blue font-bold hover:underline"

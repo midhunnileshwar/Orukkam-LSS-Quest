@@ -198,11 +198,9 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shadow-lg sticky top-0 z-30">
         <div className="flex items-center space-x-3">
-          <img
-            src="./logo.png"
-            alt="Orukkam Logo"
-            className="w-10 h-10 object-contain rounded-xl shadow-md bg-white/10 p-1 border border-white/20"
-          />
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-md">
+            🎓
+          </div>
           <div>
             <h1 className="font-black text-white text-lg">Teacher Control Room</h1>
             <p className="text-xs text-slate-400 font-medium">

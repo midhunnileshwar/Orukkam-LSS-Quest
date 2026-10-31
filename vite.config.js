@@ -19,7 +19,7 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0',
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -27,7 +27,7 @@ export default defineConfig(({ command }) => ({
   },
   preview: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0',
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       'Cross-Origin-Embedder-Policy': 'unsafe-none',

@@ -6,8 +6,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Nunito', 'sans-serif'],
-        chembakam: ['"Baloo Chettan 2"', 'cursive'],
+        sans: ['"Anek Malayalam"', 'Gayathri', 'Manjari', 'Nunito', 'sans-serif'],
+        malayalam: ['"Anek Malayalam"', 'Gayathri', 'Manjari', 'sans-serif'],
+        chembakam: ['"Anek Malayalam"', 'Gayathri', 'sans-serif'],
       },
       colors: {
         'candy-purple': '#d946ef', // Fuchsia 500
