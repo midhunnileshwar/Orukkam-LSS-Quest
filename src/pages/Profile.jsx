@@ -1,13 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, LogOut, Award, MapPin } from 'lucide-react';
+import { ArrowLeft, Check, LogOut, Award } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
 import { AVATAR_LIST, AVATAR_MAP } from '../data/avatars';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { xp, avatar, saveProfile, name, district, logout } = useGame();
+  const { xp, avatar, saveProfile, name, logout } = useGame();
   const { playSound } = useSound();
 
   const currentAvatar = AVATAR_MAP[avatar] || AVATAR_LIST[0];
@@ -57,8 +57,8 @@ export default function Profile() {
         </h2>
 
         <div className="flex items-center space-x-2 text-slate-600 font-bold text-sm sm:text-base bg-slate-100 px-4 py-1.5 rounded-full mb-6">
-          <MapPin size={16} className="text-candy-red" />
-          <span>{district || 'Kerala'} • CM Kids Quest</span>
+          <Award size={16} className="text-candy-green" />
+          <span>CM Kids Quest • LSS Scholar</span>
         </div>
 
         <div className="grid grid-cols-2 gap-4 w-full">

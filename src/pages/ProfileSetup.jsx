@@ -7,30 +7,12 @@ import { ArrowRight, Volume2, ShieldCheck, Lock, CheckCircle2 } from 'lucide-rea
 import confetti from 'canvas-confetti';
 import { AVATAR_LIST } from '../data/avatars';
 
-const DISTRICTS = [
-  'Kasaragod',
-  'Kannur',
-  'Wayanad',
-  'Kozhikode',
-  'Malappuram',
-  'Palakkad',
-  'Thrissur',
-  'Ernakulam',
-  'Idukki',
-  'Kottayam',
-  'Alappuzha',
-  'Pathanamthitta',
-  'Kollam',
-  'Thiruvananthapuram',
-];
-
 export default function ProfileSetup() {
   const navigate = useNavigate();
   const {
     saveProfile,
     user,
     name: currentName,
-    district: currentDistrict,
     parentName: currentParentName,
   } = useGame();
   const { speakText, playSound } = useSound();
@@ -38,8 +20,7 @@ export default function ProfileSetup() {
   // Steps:
   // 1: Parent Verification & DPDP Consent Gate
   // 2: Student Nickname
-  // 3: Hero Avatar
-  // 4: District
+  // 3: Hero Avatar (Finished! No location/district collected)
   const [step, setStep] = useState(1);
 
   // Parental Consent State (DPDP Act Section 9)
@@ -49,7 +30,6 @@ export default function ProfileSetup() {
   // Student State
   const [studentName, setStudentName] = useState(currentName || '');
   const [selectedAvatar, setSelectedAvatar] = useState('tiger');
-  const [selectedDistrict, setSelectedDistrict] = useState(currentDistrict || 'Kannur');
 
   useEffect(() => {
     if (step === 1) {
@@ -58,8 +38,6 @@ export default function ProfileSetup() {
       speakText('എന്താണ് നിന്റെ പേര്? What is your name?');
     } else if (step === 3) {
       speakText('നിനക്ക് ഇഷ്ടപ്പെട്ട കൂട്ടുകാരനെ തിരഞ്ഞെടുക്കൂ! Choose your hero!');
-    } else if (step === 4) {
-      speakText('നീ ഏത് ജില്ലയിലാണ് പഠിക്കുന്നത്? Which district are you from?');
     }
   }, [step]);
 
@@ -70,8 +48,6 @@ export default function ProfileSetup() {
     } else if (step === 2 && studentName.trim()) {
       setStep(3);
     } else if (step === 3 && selectedAvatar) {
-      setStep(4);
-    } else if (step === 4 && selectedDistrict) {
       handleFinish();
     }
   };
@@ -82,7 +58,6 @@ export default function ProfileSetup() {
       parentName: parentName.trim(),
       parentConsent: true,
       name: studentName.trim() || 'കുട്ടി',
-      district: selectedDistrict,
       avatar: selectedAvatar,
       isNew: false,
     });
@@ -136,10 +111,10 @@ export default function ProfileSetup() {
                 <span>ഡിജിറ്റൽ സുരക്ഷാ മുന്നറിയിപ്പ് (Cyber Safety Notice)</span>
               </div>
               <p className="leading-relaxed">
-                കേന്ദ്ര ഡിജിറ്റൽ വ്യക്തിവിവര സംരക്ഷണ നിയമം (DPDP Act, 2023 Section 9) പ്രകാരം 18 വയസ്സിന് താഴെയുള്ള കുട്ടികളുടെ വ്യക്തിവിവരങ്ങൾ ഇൻ്റർനെറ്റിൽ സൂക്ഷിക്കുവാൻ പാടില്ല.
+                കേന്ദ്ര ഡിജിറ്റൽ വ്യക്തിവിവര സംരക്ഷണ നിയമം (DPDP Act, 2023 Section 9) പ്രകാരം കുട്ടികളുടെ സ്വകാര്യത സംരക്ഷിക്കുന്നതിനായി ലൊക്കേഷനോ വ്യക്തിഗത വിവരങ്ങളോ ശേഖരിക്കുകയോ ഇൻ്റർനെറ്റിൽ സൂക്ഷിക്കുകയോ ചെയ്യുന്നില്ല.
               </p>
               <p className="leading-relaxed text-amber-300/90 font-medium">
-                ഈ ആപ്പ് കുട്ടിയുടെ വിവരങ്ങൾ ക്ലൗഡിലേക്ക് അയക്കാതെ നിങ്ങളുടെ ഉപകരണത്തിൽ (Local Storage) മാത്രമേ പൂർണ്ണ സുരക്ഷിതമായി സൂക്ഷിക്കുന്നുള്ളൂ. കുട്ടിക്കുവേണ്ടി മാതാപിതാക്കൾ രജിസ്ട്രേഷൻ പൂർത്തിയാക്കുക.
+                ഈ ആപ്പ് കുട്ടിയുടെ ഗെയിം ലെവലുകൾ നിങ്ങളുടെ സ്വന്തം ഫോണിൽ (Local Storage) മാത്രമേ പൂർണ്ണ സുരക്ഷിതമായി സൂക്ഷിക്കുന്നുള്ളൂ. കുട്ടിക്കുവേണ്ടി മാതാപിതാക്കൾ രജിസ്ട്രേഷൻ പൂർത്തിയാക്കുക.
               </p>
             </div>
 
@@ -205,7 +180,7 @@ export default function ProfileSetup() {
           </div>
         )}
 
-        {/* --- STEP 3: AVATAR --- */}
+        {/* --- STEP 3: AVATAR (FINAL STEP) --- */}
         {step === 3 && (
           <div className="text-center">
             <h2 className="text-3xl font-black mb-2 font-chembakam">കൂട്ടുകാരനെ തിരഞ്ഞെടുക്കൂ!</h2>
@@ -235,34 +210,6 @@ export default function ProfileSetup() {
           </div>
         )}
 
-        {/* --- STEP 4: DISTRICT --- */}
-        {step === 4 && (
-          <div className="text-center">
-            <h2 className="text-3xl font-black mb-2 font-chembakam">ജില്ല തിരഞ്ഞെടുക്കൂ!</h2>
-            <p className="text-purple-100 font-bold mb-4">Select Your District</p>
-
-            <div className="bg-white/90 rounded-3xl p-4 h-80 overflow-y-auto shadow-2xl border-4 border-white">
-              {DISTRICTS.map((dist) => (
-                <button
-                  type="button"
-                  key={dist}
-                  onClick={() => {
-                    setSelectedDistrict(dist);
-                    playSound('click');
-                  }}
-                  className={`w-full text-left p-3 rounded-2xl mb-2 font-black text-lg transition-all ${
-                    selectedDistrict === dist
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-700 hover:bg-purple-100'
-                  }`}
-                >
-                  📍 {dist}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* --- STEP NAVIGATION BUTTON --- */}
         <div className="mt-8 flex justify-center">
           <motion.button
@@ -270,8 +217,7 @@ export default function ProfileSetup() {
             disabled={
               (step === 1 && (!parentName.trim() || !consentChecked)) ||
               (step === 2 && !studentName.trim()) ||
-              (step === 3 && !selectedAvatar) ||
-              (step === 4 && !selectedDistrict)
+              (step === 3 && !selectedAvatar)
             }
             onClick={handleNext}
             whileHover={{ scale: 1.08 }}
@@ -282,6 +228,10 @@ export default function ProfileSetup() {
               <>
                 <CheckCircle2 size={22} />
                 <span>അനുമതി നൽകി തുടരുക (Consent & Continue)</span>
+              </>
+            ) : step === 3 ? (
+              <>
+                <span>കളി തുടങ്ങാം! (Start Quest) 🚀</span>
               </>
             ) : (
               <>
