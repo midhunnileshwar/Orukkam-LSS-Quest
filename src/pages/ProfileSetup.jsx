@@ -2,15 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
-import { ArrowRight, Mic } from 'lucide-react';
+import { useSound } from '../context/SoundContext';
+import { ArrowRight, Volume2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-
-const AVATARS = [
-  { id: 'tiger', name: 'Tiger', emoji: '🐯', color: 'bg-orange-400' },
-  { id: 'deer', name: 'Deer', emoji: '🦌', color: 'bg-amber-400' },
-  { id: 'robot', name: 'Robot', emoji: '🤖', color: 'bg-blue-400' },
-  { id: 'super', name: 'Hero', emoji: '🦸', color: 'bg-red-400' },
-];
+import { AVATAR_LIST } from '../data/avatars';
 
 const DISTRICTS = [
   'Kasaragod',
@@ -31,31 +26,23 @@ const DISTRICTS = [
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
-  const { saveProfile, user } = useGame(); // Changed from setAvatar, setUser
+  const { saveProfile, user, name: currentName } = useGame();
+  const { speakText, playSound } = useSound();
 
   const [step, setStep] = useState(1); // 1: Name, 2: Avatar, 3: District
-  const [name, setName] = useState(user?.displayName || ''); // Pre-fill from Google if available
-  const [selectedAvatar, setSelectedAvatar] = useState(null);
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-
-  // Text to Speech Helper
-  const speak = (text) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ml-IN'; // Try Malayalam, fallback to English if not available
-      window.speechSynthesis.speak(utterance);
-    }
-  };
+  const [name, setName] = useState(user?.displayName || currentName || '');
+  const [selectedAvatar, setSelectedAvatar] = useState('tiger');
+  const [selectedDistrict, setSelectedDistrict] = useState('Kannur');
 
   useEffect(() => {
-    // Voice prompts for each step
-    if (step === 1) speak('എന്താണ് നിന്റെ പേര്? What is your name?');
-    if (step === 2) speak('നിനക്ക് ഇഷ്ടപ്പെട്ട കൂട്ടുകാരനെ തിരഞ്ഞെടുക്കൂ! Choose your friend!');
-    if (step === 3) speak('നീ ഏത് ജില്ലയിലാണ് പഠിക്കുന്നത്? Which district are you from?');
+    if (step === 1) speakText('എന്താണ് നിന്റെ പേര്? What is your name?');
+    if (step === 2) speakText('നിനക്ക് ഇഷ്ടപ്പെട്ട കൂട്ടുകാരനെ തിരഞ്ഞെടുക്കൂ! Choose your hero!');
+    if (step === 3) speakText('നീ ഏത് ജില്ലയിലാണ് പഠിക്കുന്നത്? Which district are you from?');
   }, [step]);
 
   const handleNext = () => {
-    if (step === 1 && name) setStep(2);
+    playSound('pop');
+    if (step === 1 && name.trim()) setStep(2);
     else if (step === 2 && selectedAvatar) setStep(3);
     else if (step === 3 && selectedDistrict) {
       handleFinish();
@@ -63,27 +50,26 @@ export default function ProfileSetup() {
   };
 
   const handleFinish = async () => {
-    // Save profile to Firestore
+    playSound('correct');
     await saveProfile({
-      name,
+      name: name.trim() || 'കുട്ടി',
       district: selectedDistrict,
       avatar: selectedAvatar,
-      isNew: false
+      isNew: false,
     });
 
-    // Celebration
     confetti({
       particleCount: 150,
       spread: 100,
       origin: { y: 0.6 },
     });
 
-    // Redirect
-    setTimeout(() => navigate('/map'), 2000);
+    speakText('നമുക്ക് ഒരുമിച്ച് ജയിക്കാം! Let us go!');
+    setTimeout(() => navigate('/map'), 1500);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex flex-col items-center justify-center p-6 text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex flex-col items-center justify-center p-6 text-white overflow-hidden relative select-none">
       {/* Background elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
         <div className="absolute top-10 left-10 text-9xl">✨</div>
@@ -92,47 +78,65 @@ export default function ProfileSetup() {
 
       <motion.div
         key={step}
-        initial={{ x: 300, opacity: 0 }}
+        initial={{ x: 200, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        exit={{ x: -300, opacity: 0 }}
+        exit={{ x: -200, opacity: 0 }}
         className="w-full max-w-lg z-10"
       >
         {/* --- STEP 1: NAME --- */}
         {step === 1 && (
           <div className="text-center">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-8xl mb-8">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-8xl mb-6">
               👋
             </motion.div>
-            <h2 className="text-4xl font-bold mb-8 drop-shadow-md">നിന്റെ പേര് എന്താണ്?</h2>
+            <h2 className="text-3xl sm:text-4xl font-black mb-3 drop-shadow-md font-chembakam">
+              നിന്റെ പേര് എന്താണ്?
+            </h2>
+            <p className="text-purple-100 font-bold mb-6">What is your name?</p>
+
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full text-center text-4xl p-6 rounded-3xl text-slate-800 font-bold outline-none border-8 border-white/50 focus:border-yellow-400 shadow-2xl placeholder:text-slate-300"
-              placeholder="Type Name..."
+              className="w-full text-center text-3xl sm:text-4xl p-5 rounded-3xl text-slate-800 font-black outline-none border-6 border-white/50 focus:border-yellow-400 shadow-2xl placeholder:text-slate-300"
+              placeholder="പേര് നൽകൂ..."
               autoFocus
             />
+
+            <button
+              onClick={() => speakText('എന്താണ് നിന്റെ പേര്?')}
+              className="mt-4 inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full text-sm font-bold backdrop-blur-sm transition"
+            >
+              <Volume2 size={18} />
+              <span>ശബ്ദം കേൾക്കാം</span>
+            </button>
           </div>
         )}
 
         {/* --- STEP 2: AVATAR --- */}
         {step === 2 && (
           <div className="text-center">
-            <h2 className="text-3xl font-bold mb-8">Choose Your Hero!</h2>
-            <div className="grid grid-cols-2 gap-6">
-              {AVATARS.map((avi) => (
+            <h2 className="text-3xl font-black mb-2 font-chembakam">കൂട്ടുകാരനെ തിരഞ്ഞെടുക്കൂ!</h2>
+            <p className="text-purple-100 font-bold mb-6">Choose Your Hero!</p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {AVATAR_LIST.map((avi) => (
                 <motion.button
                   key={avi.id}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedAvatar(avi.id)}
-                  className={`p-6 rounded-3xl border-4 ${selectedAvatar === avi.id
-                      ? 'border-yellow-400 bg-white/20'
-                      : 'border-white/30 bg-white/10'
-                    } backdrop-blur-md transition-all`}
+                  onClick={() => {
+                    setSelectedAvatar(avi.id);
+                    playSound('pop');
+                  }}
+                  className={`p-4 rounded-3xl border-4 ${
+                    selectedAvatar === avi.id
+                      ? 'border-yellow-400 bg-white/30 shadow-cartoon'
+                      : 'border-white/30 bg-white/10 hover:bg-white/20'
+                  } backdrop-blur-md transition-all flex flex-col items-center`}
                 >
-                  <div className="text-6xl mb-2">{avi.emoji}</div>
-                  <div className="font-bold text-xl">{avi.name}</div>
+                  <div className="text-5xl mb-2">{avi.emoji}</div>
+                  <div className="font-extrabold text-sm sm:text-base">{avi.name}</div>
                 </motion.button>
               ))}
             </div>
@@ -142,37 +146,44 @@ export default function ProfileSetup() {
         {/* --- STEP 3: DISTRICT --- */}
         {step === 3 && (
           <div className="text-center">
-            <h2 className="text-3xl font-bold mb-6">Select District</h2>
-            <div className="bg-white/90 rounded-3xl p-4 h-96 overflow-y-auto shadow-2xl">
+            <h2 className="text-3xl font-black mb-2 font-chembakam">ജില്ല തിരഞ്ഞെടുക്കൂ!</h2>
+            <p className="text-purple-100 font-bold mb-4">Select Your District</p>
+
+            <div className="bg-white/90 rounded-3xl p-4 h-80 overflow-y-auto shadow-2xl border-4 border-white">
               {DISTRICTS.map((dist) => (
-                <div
+                <button
+                  type="button"
                   key={dist}
-                  onClick={() => setSelectedDistrict(dist)}
-                  className={`p-4 rounded-xl mb-2 font-bold text-lg cursor-pointer transition-colors ${selectedDistrict === dist
-                      ? 'bg-purple-600 text-white'
+                  onClick={() => {
+                    setSelectedDistrict(dist);
+                    playSound('click');
+                  }}
+                  className={`w-full text-left p-3 rounded-2xl mb-2 font-black text-lg transition-all ${
+                    selectedDistrict === dist
+                      ? 'bg-purple-600 text-white shadow-md'
                       : 'bg-slate-100 text-slate-700 hover:bg-purple-100'
-                    }`}
+                  }`}
                 >
-                  {dist}
-                </div>
+                  📍 {dist}
+                </button>
               ))}
             </div>
           </div>
         )}
 
         {/* --- NAVIGATION --- */}
-        <div className="mt-12 flex justify-center">
+        <div className="mt-8 flex justify-center">
           <motion.button
             layout
             disabled={
-              (step === 1 && !name) ||
+              (step === 1 && !name.trim()) ||
               (step === 2 && !selectedAvatar) ||
               (step === 3 && !selectedDistrict)
             }
             onClick={handleNext}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="bg-yellow-400 text-purple-900 w-20 h-20 rounded-full flex items-center justify-center font-bold shadow-[0_4px_0_rgb(180,83,9)] active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-yellow-400 text-purple-900 w-20 h-20 rounded-full flex items-center justify-center font-bold shadow-[0_6px_0_rgb(180,83,9)] active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             <ArrowRight size={40} />
           </motion.button>

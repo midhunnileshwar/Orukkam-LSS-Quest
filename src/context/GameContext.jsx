@@ -1,71 +1,98 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db, googleProvider } from '../services/firebase';
-import {
-  signInWithPopup,
-  onAuthStateChanged,
-  signOut
-} from "firebase/auth";
-import {
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  onSnapshot
-} from "firebase/firestore";
+import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
 const GameContext = createContext();
 
 export const useGame = () => useContext(GameContext);
 
+const DEFAULT_PROGRESS = {
+  maths: { 1: 'current', 2: 'locked', 3: 'locked', 4: 'locked' },
+  malayalam: { 1: 'current', 2: 'locked', 3: 'locked' },
+  english: { 1: 'current', 2: 'locked', 3: 'locked' },
+  evs: { 1: 'current', 2: 'locked', 3: 'locked' },
+  gk: { 1: 'current', 2: 'locked', 3: 'locked' },
+};
+
+const getLocalState = () => {
+  try {
+    const saved = localStorage.getItem('orukkam_game_state');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const GameProvider = ({ children }) => {
+  const localData = getLocalState() || {};
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Game State
-  const [xp, setXp] = useState(0);
-  const [hearts, setHearts] = useState(5);
-  const [avatar, setAvatar] = useState('boy');
-  const [progress, setProgress] = useState({
-    maths: { 1: 'current', 2: 'locked', 3: 'locked', 4: 'locked' },
-    malayalam: { 1: 'current', 2: 'locked' },
-    english: { 1: 'current', 2: 'locked' },
-    evs: { 1: 'current', 2: 'locked' },
-    gk: { 1: 'current', 2: 'locked' },
-  });
+  // Game State (with LocalStorage fallback for seamless offline / guest mode)
+  const [name, setName] = useState(localData.name || 'കുട്ടി');
+  const [district, setDistrict] = useState(localData.district || 'Kannur');
+  const [xp, setXp] = useState(typeof localData.xp === 'number' ? localData.xp : 0);
+  const [hearts, setHearts] = useState(typeof localData.hearts === 'number' ? localData.hearts : 5);
+  const [avatar, setAvatar] = useState(localData.avatar || 'tiger');
+  const [progress, setProgress] = useState(localData.progress || DEFAULT_PROGRESS);
+
+  // Sync to local storage whenever game state changes
+  useEffect(() => {
+    try {
+      const stateToSave = {
+        name,
+        district,
+        xp,
+        hearts,
+        avatar,
+        progress,
+      };
+      localStorage.setItem('orukkam_game_state', JSON.stringify(stateToSave));
+    } catch (e) {
+      console.warn('Could not save to localStorage', e);
+    }
+  }, [name, district, xp, hearts, avatar, progress]);
 
   // Listen for Auth Changes & Realtime DB Updates
   useEffect(() => {
     let unsubscribeAuth;
     // Safety timeout to prevent infinite blank screen
     const safetyTimeout = setTimeout(() => {
-      console.warn("Auth listener timed out, forcing app load");
       setLoading(false);
-    }, 3000);
+    }, 2000);
 
     try {
       unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         clearTimeout(safetyTimeout);
         if (currentUser) {
           // User logged in, listen to their Firestore document
-          const userRef = doc(db, "users", currentUser.uid);
+          const userRef = doc(db, 'users', currentUser.uid);
 
-          const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              setUser({ ...currentUser, ...data }); // Merge Auth + DB data
-              setXp(data.xp || 0);
-              setHearts(data.hearts || 5);
-              setAvatar(data.avatar || 'boy');
-              if (data.progress) setProgress(data.progress);
-            } else {
-              // New User (Doc doesn't exist yet) - ProfileSetup will handle creation
-              setUser({ ...currentUser, isNew: true });
+          const unsubscribeSnapshot = onSnapshot(
+            userRef,
+            (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUser({ ...currentUser, ...data });
+                if (data.name) setName(data.name);
+                if (data.district) setDistrict(data.district);
+                if (typeof data.xp === 'number') setXp(data.xp);
+                if (typeof data.hearts === 'number') setHearts(data.hearts);
+                if (data.avatar) setAvatar(data.avatar);
+                if (data.progress) setProgress(data.progress);
+              } else {
+                // New User (Doc doesn't exist yet)
+                setUser({ ...currentUser, isNew: true });
+              }
+              setLoading(false);
+            },
+            (error) => {
+              console.warn('Firestore snapshot notice:', error.message);
+              setLoading(false);
             }
-            setLoading(false);
-          }, (error) => {
-            console.error("Firestore snapshot error:", error);
-            setLoading(false); // Ensure we don't hang on error
-          });
+          );
 
           return () => unsubscribeSnapshot();
         } else {
@@ -75,7 +102,7 @@ export const GameProvider = ({ children }) => {
         }
       });
     } catch (error) {
-      console.error("Auth initialization error:", error);
+      console.warn('Auth initialization notice:', error.message);
       clearTimeout(safetyTimeout);
       setLoading(false);
     }
@@ -93,17 +120,12 @@ export const GameProvider = ({ children }) => {
       const result = await signInWithPopup(auth, googleProvider);
       return { success: true, user: result.user };
     } catch (error) {
-      console.warn("Popup blocked or failed, attempting redirect...", error);
       if (error.code === 'auth/popup-blocked' || error.message.includes('Cross-Origin')) {
         try {
-          // Fallback to redirect if popup fails
-          await import('firebase/auth').then(({ signInWithRedirect }) => {
-            return signInWithRedirect(auth, googleProvider);
-          });
-          // Redirect won't return here immediately, it reloads the page
+          const { signInWithRedirect } = await import('firebase/auth');
+          await signInWithRedirect(auth, googleProvider);
           return { success: true, pendingRedirect: true };
         } catch (redirectErr) {
-          console.error("Google Redirect Error", redirectErr);
           return { success: false, message: redirectErr.message };
         }
       }
@@ -116,9 +138,11 @@ export const GameProvider = ({ children }) => {
       const { signInAnonymously } = await import('firebase/auth');
       const result = await signInAnonymously(auth);
       return { success: true, user: result.user };
-    } catch (error) {
-      console.error("Guest Login Error", error);
-      return { success: false, message: error.message };
+    } catch {
+      // Offline fallback: allow guest play without network
+      const mockGuest = { uid: 'guest-' + Date.now(), isAnonymous: true, isNew: false };
+      setUser(mockGuest);
+      return { success: true, user: mockGuest };
     }
   };
 
@@ -128,7 +152,6 @@ export const GameProvider = ({ children }) => {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       return { success: true, user: result.user };
     } catch (error) {
-      console.error("Registration Error", error);
       return { success: false, message: error.message };
     }
   };
@@ -139,36 +162,55 @@ export const GameProvider = ({ children }) => {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: result.user };
     } catch (error) {
-      console.error("Email Login Error", error);
       return { success: false, message: error.message };
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch {
+      // ignore
+    }
+    setUser(null);
   };
 
-  // --- Database Updates ---
+  // --- Database / State Updates ---
 
   const saveProfile = async (profileData) => {
-    if (!auth.currentUser) return;
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    await setDoc(userRef, {
-      ...profileData,
-      xp,
-      hearts,
-      progress,
-      createdAt: new Date()
-    }, { merge: true });
+    if (profileData.name) setName(profileData.name);
+    if (profileData.district) setDistrict(profileData.district);
+    if (profileData.avatar) setAvatar(profileData.avatar);
 
-    // Update local state immediately to reflect changes
-    setAvatar(profileData.avatar);
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(
+          userRef,
+          {
+            ...profileData,
+            xp,
+            hearts,
+            progress,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('Could not save to remote DB, state saved locally:', e.message);
+      }
+    }
   };
 
   const updateGameState = async (updates) => {
-    if (!auth.currentUser) return;
-    const userRef = doc(db, "users", auth.currentUser.uid);
-    await updateDoc(userRef, updates);
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, updates);
+      } catch {
+        // Fallback to local state if Firestore write fails
+      }
+    }
   };
 
   const addXp = (amount) => {
@@ -189,25 +231,53 @@ export const GameProvider = ({ children }) => {
   };
 
   const completeLevel = (landId, levelId) => {
-    const newProgress = { ...progress };
-    const landProgress = { ...newProgress[landId] };
-    landProgress[levelId] = 'completed';
+    if (!landId || landId === 'daily') {
+      addXp(50);
+      return;
+    }
 
-    // Unlock next level
+    const currentLandProgress = progress[landId] ? { ...progress[landId] } : {};
+    currentLandProgress[levelId] = 'completed';
+
+    // Unlock next level if not already completed
     const nextLevel = parseInt(levelId) + 1;
-    // Simple logic: just unlock next ID
-    landProgress[nextLevel] = 'current';
+    if (currentLandProgress[nextLevel] !== 'completed') {
+      currentLandProgress[nextLevel] = 'current';
+    }
 
-    newProgress[landId] = landProgress;
+    const newProgress = {
+      ...progress,
+      [landId]: currentLandProgress,
+    };
+
     setProgress(newProgress);
-
-    // Update DB
     updateGameState({ progress: newProgress });
     addXp(50);
   };
 
+  const updateLevelStatus = (landId, levelId, status) => {
+    if (status === 'completed') {
+      completeLevel(landId, levelId);
+      return;
+    }
+
+    if (!landId || landId === 'daily') return;
+
+    const currentLandProgress = progress[landId] ? { ...progress[landId] } : {};
+    currentLandProgress[levelId] = status;
+
+    const newProgress = {
+      ...progress,
+      [landId]: currentLandProgress,
+    };
+
+    setProgress(newProgress);
+    updateGameState({ progress: newProgress });
+  };
+
   const getLevelStatus = (landId, levelId) => {
-    return progress[landId]?.[levelId] || 'locked';
+    if (!progress[landId]) return levelId === 1 || levelId === '1' ? 'current' : 'locked';
+    return progress[landId]?.[levelId] || (levelId === 1 || levelId === '1' ? 'current' : 'locked');
   };
 
   return (
@@ -215,14 +285,20 @@ export const GameProvider = ({ children }) => {
       value={{
         user,
         loading,
+        name,
+        setName,
+        district,
+        setDistrict,
         xp,
         hearts,
         avatar,
+        setAvatar,
         progress,
         addXp,
         loseHeart,
         refillHearts,
         completeLevel,
+        updateLevelStatus,
         getLevelStatus,
         loginWithGoogle,
         playAsGuest,
@@ -230,7 +306,6 @@ export const GameProvider = ({ children }) => {
         loginWithEmail,
         logout,
         saveProfile,
-        setAvatar // Kept for compatibility, though saveProfile is preferred
       }}
     >
       {!loading && children}

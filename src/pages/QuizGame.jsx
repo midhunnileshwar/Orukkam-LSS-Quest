@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Zap, Award } from 'lucide-react';
+import { ArrowLeft, Heart, Zap, Award, Volume2, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GearButton from '../components/GearButton';
 import { useGame } from '../context/GameContext';
@@ -11,148 +11,258 @@ import confetti from 'canvas-confetti';
 export default function QuizGame() {
   const { landId, levelId } = useParams();
   const navigate = useNavigate();
-  const { addXp, loseHeart, hearts, updateLevelStatus } = useGame();
-  const { playSound } = useSound();
+  const { addXp, loseHeart, refillHearts, hearts, completeLevel } = useGame();
+  const { playSound, speakText } = useSound();
 
   const [levelData, setLevelData] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [result, setResult] = useState(null); // Added result state
+  const [result, setResult] = useState(null);
 
   // Quiz State
   const [selectedOption, setSelectedOption] = useState(null);
   const [isCorrect, setIsCorrect] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [isLevelComplete, setIsLevelComplete] = useState(false);
   const [completed, setCompleted] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(30);
   const [fastAnswerBonus, setFastAnswerBonus] = useState(false);
   const [earnedXp, setEarnedXp] = useState(0);
+  const [totalXpGained, setTotalXpGained] = useState(0);
 
-  // Create isDaily flag (derived from levelId or other logic)
-  const isDaily = levelId === 'daily';
+  const isDaily = landId === 'daily' || levelId === 'mix';
 
   useEffect(() => {
     const data = getQuestionsForLevel(landId, levelId);
     setLevelData(data);
+    setCurrentQuestionIndex(0);
+    setCompleted(false);
   }, [landId, levelId]);
 
+  // Timer Countdown
   useEffect(() => {
-    if (!levelData?.questions?.[currentQuestionIndex] || selectedOption || completed || showExplanation) return;
+    if (
+      !levelData?.questions?.[currentQuestionIndex] ||
+      selectedOption ||
+      completed ||
+      showExplanation ||
+      hearts <= 0
+    )
+      return;
+
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleTimeOut();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation]);
+  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation, hearts]);
 
   const currentQuestion = levelData?.questions?.[currentQuestionIndex];
 
+  // Auto-read question text when first appearing
+  const handleReadQuestion = () => {
+    if (currentQuestion) {
+      speakText(currentQuestion.text);
+    }
+  };
 
-  if (completed) {
+  const handleTimeOut = () => {
+    playSound('wrong');
+    loseHeart();
+    speakText('സമയം കഴിഞ്ഞു! ഉത്തരം ശ്രദ്ധിക്കൂ.');
+    setResult('wrong');
+    setShowExplanation(true);
+  };
+
+  const handleOptionClick = (optionId) => {
+    if (selectedOption || showExplanation) return;
+
+    setSelectedOption(optionId);
+    playSound('click');
+
+    const correct = optionId === currentQuestion.correct;
+    setIsCorrect(correct);
+    setResult(correct ? 'correct' : 'wrong');
+
+    if (correct) {
+      playSound('correct');
+      const isFast = timeLeft >= 22;
+      const xpAmount = isFast ? 15 : 10;
+      setEarnedXp(xpAmount);
+      setTotalXpGained((prev) => prev + xpAmount);
+      setFastAnswerBonus(isFast);
+      addXp(xpAmount);
+
+      const praises = [
+        'മിടുക്കൻ! ശരിയായ ഉത്തരം!',
+        'സൂപ്പർ! വളരെ നന്ന്!',
+        'അസ്സലായിരിക്കുന്നു!',
+        'ഗ്രേറ്റ് ജോബ്!',
+      ];
+      const randomPraise = praises[Math.floor(Math.random() * praises.length)];
+      speakText(randomPraise);
+
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#4ade80', '#fbbf24', '#60a5fa'],
+      });
+
+      setTimeout(() => {
+        nextQuestion();
+      }, 1800);
+    } else {
+      setTimeout(() => {
+        playSound('wrong');
+        loseHeart();
+        speakText('സാരമില്ല! നമുക്ക് ശരിയായ ഉത്തരം നോക്കാം.');
+        setShowExplanation(true);
+      }, 400);
+    }
+  };
+
+  const nextQuestion = () => {
+    setSelectedOption(null);
+    setIsCorrect(null);
+    setShowExplanation(false);
+    setResult(null);
+    setFastAnswerBonus(false);
+    setEarnedXp(0);
+    setTimeLeft(30);
+
+    if (currentQuestionIndex < (levelData?.questions?.length || 0) - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+    } else {
+      // Level Finished
+      playSound('levelUp');
+      setCompleted(true);
+      confetti({
+        particleCount: 300,
+        spread: 160,
+        origin: { y: 0.4 },
+        colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'],
+      });
+      speakText('അഭിനന്ദനങ്ങൾ! നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!');
+      completeLevel(landId, levelId);
+    }
+  };
+
+  const handleReturnNavigation = () => {
+    if (isDaily) {
+      navigate('/map');
+    } else {
+      navigate(`/land/${landId}`);
+    }
+  };
+
+  // Hearts exhausted screen
+  if (hearts <= 0) {
     return (
-      <div className="min-h-screen bg-candy-green flex flex-col items-center justify-center text-white relative overflow-hidden">
-        <h1 className="text-6xl font-black mb-4 animate-bounce drop-shadow-lg">VICTORY!</h1>
-        <div className="text-9xl mb-8 animate-spin-slow">⭐</div>
-        <div className="bg-white/20 p-6 rounded-[2rem] backdrop-blur-sm border-4 border-white text-center">
-          <p className="text-2xl font-bold mb-2">Level Complete!</p>
-          <p className="text-xl">+50 XP Earned</p>
-        </div>
-        <button
-          onClick={() => navigate(`/land/${landId}`)}
-          className="mt-12 bg-white text-candy-green font-black py-4 px-12 rounded-full shadow-cartoon text-xl hover:scale-105 transition-transform"
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-slate-800 border-4 border-candy-red p-8 rounded-[2.5rem] max-w-md shadow-2xl flex flex-col items-center"
         >
-          Continue Journey ➔
-        </button>
+          <div className="text-7xl mb-4 animate-bounce">💔</div>
+          <h2 className="text-3xl font-black mb-2 text-candy-red">ഹൃദയങ്ങൾ തീർന്നു!</h2>
+          <p className="text-slate-300 text-lg mb-6 font-semibold">
+            വിഷമിക്കേണ്ട! ഒന്നു വിശ്രമിച്ച് നമുക്ക് വീണ്ടും തുടങ്ങാം.
+          </p>
+          <button
+            onClick={() => {
+              refillHearts();
+              setTimeLeft(30);
+              setShowExplanation(false);
+              setSelectedOption(null);
+              playSound('click');
+            }}
+            className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all flex items-center justify-center space-x-2"
+          >
+            <RotateCcw size={24} />
+            <span>ജീവൻ വീണ്ടെടുക്കൂ (Refill Hearts ❤️)</span>
+          </button>
+          <button
+            onClick={handleReturnNavigation}
+            className="mt-4 text-slate-400 font-bold hover:text-white"
+          >
+            തിരികെ പോകാം (Go Back)
+          </button>
+        </motion.div>
       </div>
     );
   }
 
+  // Victory / Completed Screen
+  if (completed) {
+    return (
+      <div className="min-h-screen bg-candy-green flex flex-col items-center justify-center text-white relative overflow-hidden p-6 text-center">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', bounce: 0.5 }}
+          className="flex flex-col items-center max-w-md w-full"
+        >
+          <h1 className="text-6xl font-black mb-2 animate-bounce drop-shadow-lg">വിജയം! 🌟</h1>
+          <p className="text-xl font-bold mb-6 text-green-100">VICTORY!</p>
+
+          <div className="bg-white/20 p-8 rounded-[2.5rem] backdrop-blur-md border-4 border-white text-center w-full shadow-2xl mb-8">
+            <Award size={80} className="text-yellow-300 mx-auto mb-4 animate-pulse" />
+            <h3 className="text-3xl font-black mb-2">ലെവൽ പൂർത്തിയായി!</h3>
+            <p className="text-lg opacity-90 mb-4 font-semibold">Level {levelId} Finished</p>
+            <div className="bg-white/25 py-3 px-6 rounded-2xl inline-block border-2 border-white/50">
+              <span className="text-2xl font-black text-yellow-300">+{totalXpGained + 50} XP</span>
+              <span className="text-sm block text-white/80 font-bold">Total Bonus</span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleReturnNavigation}
+            className="w-full bg-white text-candy-green font-black py-5 px-10 rounded-full shadow-cartoon text-2xl hover:scale-105 active:scale-95 transition-all border-4 border-white"
+          >
+            തുടരാം ➔ (Continue)
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Content Missing / Work In Progress
   if (!levelData) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl font-bold font-chembakam text-center">
-          Work in Progress... <br />
-          (Questions coming soon for Level {levelId})
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+        <div className="bg-slate-800 p-8 rounded-3xl border-4 border-slate-700 text-white text-xl font-bold text-center max-w-md">
+          <p className="text-4xl mb-4">🚧</p>
+          <p className="mb-2">ചോദ്യങ്ങൾ തയ്യാറാകുന്നു...</p>
+          <p className="text-slate-400 text-sm mb-6">Questions coming soon for Level {levelId}</p>
           <button
             onClick={() => navigate(-1)}
-            className="mt-8 bg-candy-blue px-6 py-3 rounded-xl text-sm font-bold shadow-lg hover:scale-105 transition"
+            className="bg-candy-blue text-white px-8 py-3 rounded-2xl text-base font-black shadow-cartoon hover:scale-105 active:scale-95 transition"
           >
-            Go Back
+            ← തിരികെ പോകാം (Go Back)
           </button>
         </div>
       </div>
     );
   }
 
-  if (!currentQuestion)
+  if (!currentQuestion) {
     return (
-      <div className="text-white text-center mt-20 font-black animate-pulse">
-        Loading Machine...
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-black text-2xl animate-pulse">
+        ചോദ്യം ഒരുങ്ങുന്നു...
       </div>
     );
-
-  const handleOptionClick = (optionId) => {
-    if (selectedOption) return; // Prevent multiple selections
-
-    setSelectedOption(optionId);
-    playSound('click');
-
-    // Check answer
-    const correct = optionId === currentQuestion.correct;
-    setIsCorrect(correct);
-    setResult(correct ? 'correct' : 'wrong'); // Set result for styling
-
-    if (correct) {
-      playSound('correct');
-      const isFast = timeLeft >= 25; // Answered within 5 seconds
-      const xpAmount = isFast ? 15 : 10;
-      setEarnedXp(xpAmount);
-      setFastAnswerBonus(isFast);
-      addXp(xpAmount); // Add XP for correct answer
-
-      confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#4ade80', '#fbbf24', '#60a5fa'] });
-
-      setTimeout(() => {
-        nextQuestion();
-      }, 2000); // 2 second delay to show animations before moving to next question
-    } else {
-      setTimeout(() => {
-        playSound('wrong');
-        loseHeart();
-        setShowExplanation(true); // Show explanation for wrong answer
-      }, 500);
-    }
-  };
-
-  // const handleWrong = () => {
-  //     setResult('wrong');
-  //     loseHeart();
-  //     setTimeout(() => setShowExplanation(true), 1000);
-  // };
-
-  const nextQuestion = () => {
-    setSelectedOption(null);
-    setIsCorrect(null);
-    setShowExplanation(false);
-    setResult(null); // Reset result state
-    setFastAnswerBonus(false);
-    setEarnedXp(0);
-    setTimeLeft(30);
-
-    if (currentQuestionIndex < levelData.questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    } else {
-      // Level Finished
-      playSound('levelUp');
-      setCompleted(true);
-      confetti({ particleCount: 300, spread: 160, origin: { y: 0.4 }, colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'] });
-      updateLevelStatus(landId, parseInt(levelId), 'completed');
-      // Add extra bonus for full level?
-    }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center relative overflow-hidden">
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center relative overflow-hidden select-none">
       {/* Background Patterns */}
       <div
         className="absolute inset-0 opacity-10"
@@ -160,111 +270,105 @@ export default function QuizGame() {
           backgroundImage: 'radial-gradient(circle, #ffffff 2px, transparent 2px)',
           backgroundSize: '24px 24px',
         }}
-      ></div>
+      />
 
       {/* Top Bar */}
-      <div className="w-full p-4 flex justify-between items-center text-white z-10 relative">
+      <div className="w-full p-4 flex justify-between items-center text-white z-10 relative max-w-2xl">
         <button
-          onClick={() => navigate(-1)}
-          className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition shadow-lg border-2 border-white/10"
+          onClick={handleReturnNavigation}
+          className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition shadow-lg border-2 border-white/10 active:scale-95"
+          title="Go Back"
         >
           <ArrowLeft size={28} />
         </button>
-        <div className="flex space-x-2 bg-black/40 px-4 py-2 rounded-full border border-white/20">
+
+        {/* Hearts */}
+        <div className="flex space-x-1.5 bg-black/40 px-3 py-2 rounded-full border border-white/20">
           {[...Array(5)].map((_, i) => (
             <Heart
               key={i}
-              size={28}
-              className={`filter drop-shadow-md ${i < hearts ? 'fill-candy-red text-candy-red animate-pulse' : 'text-slate-600'
-                }`}
+              size={24}
+              className={`filter drop-shadow-md transition-all ${
+                i < hearts ? 'fill-candy-red text-candy-red scale-100' : 'text-slate-600 scale-90'
+              }`}
             />
           ))}
         </div>
 
         {/* Timer UI */}
-        <div className={`font-mono text-2xl font-black px-4 py-2 rounded-full border-2 border-white/50 shadow-cartoon transition-colors ${timeLeft <= 5 ? 'bg-candy-red text-white animate-pulse' : 'bg-candy-blue text-white'}`}>
+        <div
+          className={`font-mono text-xl sm:text-2xl font-black px-4 py-2 rounded-full border-2 border-white/50 shadow-cartoon transition-colors ${
+            timeLeft <= 5 ? 'bg-candy-red text-white animate-pulse' : 'bg-candy-blue text-white'
+          }`}
+        >
           ⏳ {timeLeft}s
         </div>
 
-        <div className="bg-candy-green text-white px-4 py-2 rounded-full font-black text-lg shadow-cartoon border-2 border-white/50">
+        {/* Question Counter */}
+        <div className="bg-candy-green text-white px-4 py-2 rounded-full font-black text-base sm:text-lg shadow-cartoon border-2 border-white/50">
           {currentQuestionIndex + 1}/{levelData?.questions?.length || 0}
         </div>
       </div>
 
-      {/* Level Complete Overlay */}
-      {isLevelComplete && (
-        <div className="absolute inset-0 bg-candy-purple/95 z-50 flex flex-col items-center justify-center animate-in fade-in zoom-in text-center p-8 backdrop-blur-sm">
-          <div className="bg-white/10 p-10 rounded-[3rem] border-8 border-white/20 shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
-            <Award
-              size={100}
-              className="text-candy-yellow drop-shadow-xl mb-4 mx-auto animate-bounce"
-            />
-            <h1 className="text-5xl font-black text-white mb-2 drop-shadow-lg">Factory Fixed!</h1>
-            <p className="text-2xl text-white/90 mb-8 font-bold">
-              You earned {isDaily ? '100' : '3'} Golden Gears!
-            </p>
+      {/* Question Card (The Machine Screen) */}
+      <div className="flex-1 w-full max-w-lg px-4 py-2 flex flex-col justify-center relative z-10">
+        <div className="bg-slate-800 border-[6px] border-slate-600 rounded-[2rem] p-6 mb-6 shadow-2xl relative overflow-hidden transform rotate-0.5">
+          {/* Bolts */}
+          <div className="absolute top-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
+          <div className="absolute top-3 right-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
+          <div className="absolute bottom-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
+          <div className="absolute bottom-3 right-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
+
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              {levelData.title || `Level ${levelId}`}
+            </span>
             <button
-              onClick={() => navigate(isDaily ? '/map' : `/land/${landId}`)}
-              className="bg-white text-candy-purple font-black px-10 py-5 rounded-full shadow-cartoon-lg text-2xl hover:scale-105 transition border-4 border-candy-yellow"
+              onClick={handleReadQuestion}
+              className="flex items-center space-x-1 bg-indigo-600/80 hover:bg-indigo-500 text-white px-3 py-1 rounded-full text-xs font-bold active:scale-95 transition"
             >
-              Continue Journey
+              <Volume2 size={16} />
+              <span>വായിക്കാം</span>
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Question Card (The Machine Screen) */}
-      <div className="flex-1 w-full max-w-lg p-6 flex flex-col justify-center relative z-10">
-        <div className="bg-slate-800 border-[8px] border-slate-600 rounded-[2rem] p-8 mb-8 shadow-2xl relative overflow-hidden transform rotate-1">
-          {/* Screen Glare */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10 pointer-events-none"></div>
-
-          {/* Bolts */}
-          <div className="absolute top-4 left-4 w-4 h-4 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
-          <div className="absolute top-4 right-4 w-4 h-4 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
-          <div className="absolute bottom-4 left-4 w-4 h-4 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
-          <div className="absolute bottom-4 right-4 w-4 h-4 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
-
-          <h2 className="text-3xl font-black text-candy-green text-center leading-relaxed drop-shadow-sm font-mono">
+          <h2 className="text-2xl sm:text-3xl font-black text-candy-green text-center leading-relaxed drop-shadow-sm font-chembakam my-2">
             {currentQuestion.text}
           </h2>
         </div>
 
         {/* Options Grid */}
-        <div className="grid grid-cols-2 gap-8 w-full place-items-center relative">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full place-items-center relative">
           {currentQuestion.options.map((option) => (
             <GearButton
               key={option.id}
-              option={option.id}
+              option={option.id.toUpperCase()}
               text={option.text}
               isSelected={selectedOption === option.id}
-              result={result}
+              result={selectedOption === option.id ? result : null}
               onClick={() => handleOptionClick(option.id)}
-              disabled={!!selectedOption}
+              disabled={!!selectedOption || showExplanation}
             />
           ))}
 
-          {/* Floating Action Animations */}
+          {/* Floating XP Animation */}
           <AnimatePresence>
             {selectedOption && isCorrect && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.5, y: 50 }}
-                animate={{ opacity: 1, scale: 1, y: -50 }}
-                exit={{ opacity: 0, y: -100 }}
-                transition={{ duration: 0.8, type: 'spring' }}
+                animate={{ opacity: 1, scale: 1, y: -40 }}
+                exit={{ opacity: 0, y: -80 }}
+                transition={{ duration: 0.7, type: 'spring' }}
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center z-50"
               >
-                <div className="text-6xl mb-2 animate-bounce">🌟</div>
-                <div className="bg-white/90 backdrop-blur-sm px-6 py-3 rounded-full border-4 border-candy-yellow shadow-2xl flex flex-col items-center">
+                <div className="text-6xl mb-1 animate-bounce">🌟</div>
+                <div className="bg-white/95 backdrop-blur-sm px-6 py-2 rounded-full border-4 border-candy-yellow shadow-2xl flex flex-col items-center">
                   {fastAnswerBonus && (
-                    <span className="text-candy-red font-black text-xl animate-pulse mb-1">
+                    <span className="text-candy-red font-black text-sm animate-pulse">
                       ⚡ FAST ANSWER!
                     </span>
                   )}
-                  <span className="text-candy-green font-black text-3xl">
-                    +{earnedXp} XP!
-                  </span>
+                  <span className="text-candy-green font-black text-2xl">+{earnedXp} XP!</span>
                 </div>
               </motion.div>
             )}
@@ -272,28 +376,33 @@ export default function QuizGame() {
         </div>
       </div>
 
-      {/* Explanation Modal */}
+      {/* Explanation Modal (The Did You Know / Repair Card) */}
       <AnimatePresence>
         {showExplanation && (
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[3rem] p-8 shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-40 border-t-8 border-candy-red"
+            transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[2.5rem] p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-50 border-t-8 border-candy-red max-w-xl mx-auto"
           >
-            <div className="w-16 h-2 bg-slate-200 rounded-full mx-auto mb-6"></div>
-            <div className="flex items-center space-x-3 mb-4">
-              <Zap className="text-candy-red fill-current animate-pulse" size={32} />
-              <h3 className="text-2xl font-black text-candy-red">Machine Jammed!</h3>
+            <div className="w-16 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
+
+            <div className="flex items-center space-x-3 mb-3">
+              <Zap className="text-candy-red fill-current animate-pulse" size={28} />
+              <h3 className="text-2xl font-black text-slate-800">ശരിയായ ഉത്തരം നോക്കാം! 💡</h3>
             </div>
-            <p className="text-slate-600 text-lg font-bold mb-8 leading-relaxed bg-red-50 p-4 rounded-xl border-l-4 border-candy-red">
-              {currentQuestion.explanation}
+
+            <p className="text-slate-700 text-base sm:text-lg font-bold mb-6 leading-relaxed bg-red-50 p-4 rounded-2xl border-l-4 border-candy-red">
+              {currentQuestion.explanation ||
+                'ശ്രമിച്ചത് നല്ല കാര്യം! അടുത്ത ചോദ്യത്തിൽ കൂടുതൽ ശ്രദ്ധിക്കാം.'}
             </p>
+
             <button
               onClick={nextQuestion}
-              className="w-full bg-candy-green text-white font-black py-5 rounded-3xl shadow-cartoon text-xl active:translate-y-1 active:shadow-none border-b-4 border-green-700 transition-all"
+              className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-black py-4 rounded-2xl shadow-cartoon text-xl active:translate-y-1 border-b-4 border-green-700 transition-all"
             >
-              Repair & Continue 🔧
+              തുടരാം ➔ (Continue)
             </button>
           </motion.div>
         )}
