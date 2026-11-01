@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function EmotionSliderView({ question, onAnswer, disabled }) {
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    setSelected(null);
+  }, [question.id]);
 
   const handleSelect = (emotionId, e) => {
     if (disabled || selected) return;

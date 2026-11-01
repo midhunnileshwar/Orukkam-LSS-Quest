@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function MissingLetterView({ question, onAnswer, disabled }) {
   const [selectedLetter, setSelectedLetter] = useState(null);
+
+  useEffect(() => {
+    setSelectedLetter(null);
+  }, [question.id]);
   const target = (question.missingLetter || '').toUpperCase();
 
   const handleWhack = (letter, e) => {

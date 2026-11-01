@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function SpotErrorView({ question, onAnswer, disabled }) {
   const [poppedWord, setPoppedWord] = useState(null);
   const [wrongTappedWord, setWrongTappedWord] = useState(null);
+
+  useEffect(() => {
+    setPoppedWord(null);
+    setWrongTappedWord(null);
+  }, [question.id]);
 
   // Split sentence into words, preserving punctuation
   const words = (question.sentence || '').split(' ');

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, RotateCcw, Link2 } from 'lucide-react';
 
@@ -28,6 +28,11 @@ export default function MatchFollowingView({ question, onAnswer, disabled }) {
 
   // Map of left item -> right item
   const [matches, setMatches] = useState({});
+
+  useEffect(() => {
+    setSelectedLeft(null);
+    setMatches({});
+  }, [question.id]);
 
   const isAllMatched = Object.keys(matches).length === leftItems.length && leftItems.length > 0;
 

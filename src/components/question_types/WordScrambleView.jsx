@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, RotateCcw } from 'lucide-react';
 
@@ -8,6 +8,10 @@ export default function WordScrambleView({ question, onAnswer, disabled }) {
 
   // Placed letter objects: [{ id, letter }]
   const [placed, setPlaced] = useState([]);
+
+  useEffect(() => {
+    setPlaced([]);
+  }, [question.id]);
 
   // Remaining available letter objects in tray
   const placedIds = placed.map((p) => p.id);

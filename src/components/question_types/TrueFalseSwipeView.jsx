@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 
@@ -6,6 +6,11 @@ export default function TrueFalseSwipeView({ question, onAnswer, disabled }) {
   const [answered, setAnswered] = useState(null);
 
   const x = useMotionValue(0);
+
+  useEffect(() => {
+    setAnswered(null);
+    x.set(0);
+  }, [question.id, x]);
   const rotate = useTransform(x, [-200, 200], [-20, 20]);
   const background = useTransform(
     x,

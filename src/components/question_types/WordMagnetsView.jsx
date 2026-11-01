@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, RotateCcw } from 'lucide-react';
 
@@ -7,6 +7,10 @@ export default function WordMagnetsView({ question, onAnswer, disabled }) {
   const wordTokens = (question.jumbled || []).map((w, idx) => ({ id: `${w}_${idx}`, word: w }));
 
   const [placed, setPlaced] = useState([]);
+
+  useEffect(() => {
+    setPlaced([]);
+  }, [question.id]);
   const placedIds = placed.map((p) => p.id);
   const isFull = placed.length === wordTokens.length && wordTokens.length > 0;
 

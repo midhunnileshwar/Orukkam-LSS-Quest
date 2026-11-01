@@ -320,14 +320,63 @@ export default function QuizGame() {
     completeLevel(landId, levelId);
   };
 
+  // Helper to determine if a question has standard MCQ option objects
+  const isStandardMcq = (q) =>
+    Array.isArray(q?.options) &&
+    q.options.length > 0 &&
+    typeof q.options[0] === 'object' &&
+    q.options[0] !== null &&
+    'id' in q.options[0];
+
+  // Helper to safely render correct answer in worksheet without crashing on interactive types
+  const getCorrectAnswerDisplay = (q) => {
+    if (!q) return '';
+    if (q.correctAnswers) {
+      return Object.entries(q.correctAnswers)
+        .map(([slot, ans]) => `(${slot}) ${ans}`)
+        .join(', ');
+    }
+    if (q.correctSequence) {
+      return q.correctSequence.join(' ➔ ');
+    }
+    if (q.correctPairs) {
+      return Object.entries(q.correctPairs)
+        .map(([k, v]) => `${k} = ${v}`)
+        .join(', ');
+    }
+    if (q.pairs) {
+      return q.pairs.map((p) => `${p.left} = ${p.right}`).join(', ');
+    }
+    if (q.targetWord) {
+      return q.targetWord;
+    }
+    if (q.correctSentence) {
+      return q.correctSentence;
+    }
+    if (q.correctLetter) {
+      return q.correctLetter;
+    }
+    if (q.syllables) {
+      return `${q.word} (${q.syllables} syllables)`;
+    }
+    if (Array.isArray(q.options)) {
+      const found = q.options.find((o) =>
+        typeof o === 'object' && o !== null ? o.id === q.correct : o === q.correct
+      );
+      if (found) {
+        return typeof found === 'object' ? found.text || found.id : found;
+      }
+    }
+    return q.correct || '';
+  };
+
   // --- REQUIREMENT 2: MASTERY SOLVING OF MISSED QUESTIONS ---
   const activeMasteryQuestion = missedQuestions[masteryIndex];
 
-  const handleMasteryOptionClick = (optionId) => {
+  const handleMasteryAnswer = (isAnswerCorrect, choiceId = null) => {
     if (masterySelectedOption || !activeMasteryQuestion) return;
-    setMasterySelectedOption(optionId);
+    setMasterySelectedOption(choiceId || (isAnswerCorrect ? 'correct' : 'wrong'));
 
-    const isAnswerCorrect = optionId === activeMasteryQuestion.correct;
     if (isAnswerCorrect) {
       playSound('correct');
       confetti({
@@ -390,11 +439,10 @@ export default function QuizGame() {
     missedQuestions.length > 0 ? missedQuestions : levelData?.questions ? [levelData.questions[0]] : [];
   const activeRecoveryQuestion = activeRecoveryQuestions[recoveryIndex] || activeRecoveryQuestions[0];
 
-  const handleRecoveryOptionClick = (optionId) => {
+  const handleRecoveryAnswer = (isAnswerCorrect, choiceId = null) => {
     if (recoverySelectedOption || !activeRecoveryQuestion) return;
-    setRecoverySelectedOption(optionId);
+    setRecoverySelectedOption(choiceId || (isAnswerCorrect ? 'correct' : 'wrong'));
 
-    const isAnswerCorrect = optionId === activeRecoveryQuestion.correct;
     if (isAnswerCorrect) {
       playSound('energyRecharge');
       confetti({
@@ -513,33 +561,46 @@ export default function QuizGame() {
                     : 'ചോദ്യം ശ്രദ്ധയോടെ വായിച്ചുനോക്കി ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.')}
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                {activeRecoveryQuestion.options.map((opt) => {
-                  const isChosen = recoverySelectedOption === opt.id;
-                  const isRightAnswer = opt.id === activeRecoveryQuestion.correct;
-                  let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
+              {isStandardMcq(activeRecoveryQuestion) ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {activeRecoveryQuestion.options.map((opt) => {
+                    const isChosen = recoverySelectedOption === opt.id;
+                    const isRightAnswer = opt.id === activeRecoveryQuestion.correct;
+                    let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
 
-                  if (isChosen) {
-                    btnBg = isRightAnswer
-                      ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
-                      : 'bg-rose-600 text-white border-rose-400';
-                  }
+                    if (isChosen) {
+                      btnBg = isRightAnswer
+                        ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
+                        : 'bg-rose-600 text-white border-rose-400';
+                    }
 
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => handleRecoveryOptionClick(opt.id)}
-                      disabled={!!recoverySelectedOption}
-                      className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
-                    >
-                      <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
-                        {opt.id.toUpperCase()}
-                      </span>
-                      <span className="line-clamp-2">{opt.text}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() =>
+                          handleRecoveryAnswer(opt.id === activeRecoveryQuestion.correct, opt.id)
+                        }
+                        disabled={!!recoverySelectedOption}
+                        className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
+                      >
+                        <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
+                          {opt.id.toUpperCase()}
+                        </span>
+                        <span className="line-clamp-2">{opt.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="w-full">
+                  <InteractiveQuestionRenderer
+                    key={activeRecoveryQuestion.id}
+                    question={activeRecoveryQuestion}
+                    onAnswer={(isCorrect) => handleRecoveryAnswer(isCorrect)}
+                    disabled={!!recoverySelectedOption}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -619,33 +680,46 @@ export default function QuizGame() {
                   : 'ചോദ്യം വീണ്ടും ശ്രദ്ധിച്ച് ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.')}
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {activeMasteryQuestion.options.map((opt) => {
-                const isChosen = masterySelectedOption === opt.id;
-                const isRightAnswer = opt.id === activeMasteryQuestion.correct;
-                let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
+            {isStandardMcq(activeMasteryQuestion) ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                {activeMasteryQuestion.options.map((opt) => {
+                  const isChosen = masterySelectedOption === opt.id;
+                  const isRightAnswer = opt.id === activeMasteryQuestion.correct;
+                  let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
 
-                if (isChosen) {
-                  btnBg = isRightAnswer
-                    ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
-                    : 'bg-rose-600 text-white border-rose-400';
-                }
+                  if (isChosen) {
+                    btnBg = isRightAnswer
+                      ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
+                      : 'bg-rose-600 text-white border-rose-400';
+                  }
 
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => handleMasteryOptionClick(opt.id)}
-                    disabled={!!masterySelectedOption}
-                    className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
-                  >
-                    <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
-                      {opt.id.toUpperCase()}
-                    </span>
-                    <span className="line-clamp-2">{opt.text}</span>
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() =>
+                        handleMasteryAnswer(opt.id === activeMasteryQuestion.correct, opt.id)
+                      }
+                      disabled={!!masterySelectedOption}
+                      className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
+                    >
+                      <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
+                        {opt.id.toUpperCase()}
+                      </span>
+                      <span className="line-clamp-2">{opt.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="w-full">
+                <InteractiveQuestionRenderer
+                  key={activeMasteryQuestion.id}
+                  question={activeMasteryQuestion}
+                  onAnswer={(isCorrect) => handleMasteryAnswer(isCorrect)}
+                  disabled={!!masterySelectedOption}
+                />
+              </div>
+            )}
           </div>
 
           <button
@@ -857,7 +931,6 @@ export default function QuizGame() {
 
                   <div className="space-y-4">
                     {levelData?.questions?.map((q, idx) => {
-                      const correctOpt = q.options.find((o) => o.id === q.correct);
                       return (
                         <div
                           key={q.id || idx}
@@ -868,7 +941,7 @@ export default function QuizGame() {
                               {idx + 1}
                             </span>
                             <h4 className="font-black text-slate-800 text-sm sm:text-base leading-snug">
-                              {q.text}
+                              {q.text || q.instruction || q.prompt || q.title}
                             </h4>
                           </div>
 
@@ -877,7 +950,7 @@ export default function QuizGame() {
                               <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
                               <span>
                                 {isEnglish ? 'Correct Answer: ' : 'ശരിയായ ഉത്തരം: '}
-                                {correctOpt?.text || q.correct}
+                                {getCorrectAnswerDisplay(q)}
                               </span>
                             </div>
 
@@ -1063,6 +1136,7 @@ export default function QuizGame() {
         {/* Dynamic Multi-Format Interactive Question Engine */}
         <div className="w-full relative">
           <InteractiveQuestionRenderer
+            key={currentQuestion.id}
             question={currentQuestion}
             selectedOption={selectedOption}
             result={result}

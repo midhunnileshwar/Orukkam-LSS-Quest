@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function SyllableClapsView({ question, onAnswer, disabled }) {
   const [selectedCount, setSelectedCount] = useState(null);
+
+  useEffect(() => {
+    setSelectedCount(null);
+  }, [question.id]);
   const target = question.syllablesCount;
 
   const handleClap = (count, e) => {

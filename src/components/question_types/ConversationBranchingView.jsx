@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
 
 export default function ConversationBranchingView({ question, onAnswer, disabled }) {
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    setSelected(null);
+  }, [question.id]);
 
   const handleChoice = (optionId, e) => {
     if (disabled || selected) return;

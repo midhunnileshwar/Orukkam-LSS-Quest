@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp, ArrowDown, Check, RotateCcw } from 'lucide-react';
 
 export default function SequenceBuilderView({ question, onAnswer, disabled }) {
   // Start with items in their initial given order
   const [currentOrder, setCurrentOrder] = useState(() => (question.items || []).map((item) => item.id));
+
+  useEffect(() => {
+    setCurrentOrder((question.items || []).map((item) => item.id));
+  }, [question.id]);
 
   const itemsMap = (question.items || []).reduce((acc, item) => {
     acc[item.id] = item.text;

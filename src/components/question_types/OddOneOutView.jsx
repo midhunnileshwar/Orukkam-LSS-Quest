@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function OddOneOutView({ question, onAnswer, disabled }) {
   const [selectedWord, setSelectedWord] = useState(null);
+
+  useEffect(() => {
+    setSelectedWord(null);
+  }, [question.id]);
   const targetOdd = (question.oddOne || '').toLowerCase().trim();
 
   const handleCardClick = (word, e) => {
