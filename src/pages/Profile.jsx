@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, LogOut, Award, BookOpen } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
-import { AVATAR_LIST, AVATAR_MAP } from '../data/avatars';
+import { AVATAR_LIST, AVATAR_MAP, getAvatarName } from '../data/avatars';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { xp, avatar, saveProfile, name, medium, logout } = useGame();
   const { playSound, speakMalayalam, speakUKEnglish } = useSound();
 
+  const isEnglish = medium === 'english';
   const currentAvatar = AVATAR_MAP[avatar] || AVATAR_LIST[0];
 
   const handleSelectAvatar = (id) => {
@@ -33,6 +34,12 @@ export default function Profile() {
   };
 
   const getRank = (xpPoints) => {
+    if (isEnglish) {
+      if (xpPoints >= 500) return 'Star Champion';
+      if (xpPoints >= 250) return 'Smart Learner';
+      if (xpPoints >= 100) return 'Explorer';
+      return 'Beginner';
+    }
     if (xpPoints >= 500) return 'താരം (Star Champion)';
     if (xpPoints >= 250) return 'മിടുക്കൻ (Smart Learner)';
     if (xpPoints >= 100) return 'സാഹസികൻ (Explorer)';
@@ -45,11 +52,12 @@ export default function Profile() {
         <button
           onClick={() => navigate('/map')}
           className="p-3 bg-white rounded-full shadow-cartoon hover:scale-105 active:scale-95 border-2 border-slate-100 transition"
+          title={isEnglish ? 'Back to Map' : 'മാപ്പിലേക്ക്'}
         >
           <ArrowLeft size={28} className="text-slate-700" />
         </button>
-        <h1 className="text-2xl sm:text-3xl font-black text-candy-purple font-malayalam">
-          എന്റെ പ്രൊഫൈൽ (Profile)
+        <h1 className="text-2xl sm:text-3xl font-black text-candy-purple">
+          {isEnglish ? 'My Profile' : 'എന്റെ പ്രൊഫൈൽ (Profile)'}
         </h1>
         <div className="w-12 h-12" />
       </div>
@@ -62,8 +70,8 @@ export default function Profile() {
           {currentAvatar.emoji}
         </div>
 
-        <h2 className="text-3xl sm:text-4xl font-black text-slate-800 mb-2 font-chembakam">
-          {name || 'കൂട്ടുകാരൻ'}
+        <h2 className="text-3xl sm:text-4xl font-black text-slate-800 mb-2">
+          {name || (isEnglish ? 'Learner' : 'കൂട്ടുകാരൻ')}
         </h2>
 
         <div className="flex items-center space-x-2 text-slate-600 font-bold text-sm sm:text-base bg-slate-100 px-4 py-1.5 rounded-full mb-6">
@@ -97,29 +105,12 @@ export default function Profile() {
       <div className="bg-white rounded-[2rem] p-6 shadow-cartoon mb-6 border-4 border-white">
         <div className="flex items-center space-x-2 mb-4">
           <BookOpen className="text-indigo-600" size={24} />
-          <h3 className="text-xl font-black text-slate-800 font-chembakam">
-            പഠന മാധ്യമം (Medium of Learning)
+          <h3 className="text-xl font-black text-slate-800">
+            {isEnglish ? 'Medium of Learning' : 'പഠന മാധ്യമം (Medium of Learning)'}
           </h3>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => handleToggleMedium('malayalam')}
-            className={`p-4 rounded-2xl border-4 font-black text-sm flex flex-col items-center transition-all ${
-              medium !== 'english'
-                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md ring-4 ring-emerald-100'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <span className="text-3xl mb-1">🌴</span>
-            <span>മലയാളം മീഡിയം</span>
-            {medium !== 'english' && (
-              <span className="text-xs font-bold text-emerald-600 mt-1 flex items-center">
-                <Check size={14} className="mr-0.5" /> Selected
-              </span>
-            )}
-          </button>
-
           <button
             onClick={() => handleToggleMedium('english')}
             className={`p-4 rounded-2xl border-4 font-black text-sm flex flex-col items-center transition-all ${
@@ -136,12 +127,29 @@ export default function Profile() {
               </span>
             )}
           </button>
+
+          <button
+            onClick={() => handleToggleMedium('malayalam')}
+            className={`p-4 rounded-2xl border-4 font-black text-sm flex flex-col items-center transition-all ${
+              medium !== 'english'
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md ring-4 ring-emerald-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <span className="text-3xl mb-1">🌴</span>
+            <span>മലയാളം മീഡിയം</span>
+            {medium !== 'english' && (
+              <span className="text-xs font-bold text-emerald-600 mt-1 flex items-center">
+                <Check size={14} className="mr-0.5" /> Selected
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Avatar Selection */}
-      <h3 className="text-xl font-black text-slate-700 mb-4 ml-2 font-chembakam">
-        കൂട്ടുകാരനെ മാറ്റാം (Change Avatar)
+      <h3 className="text-xl font-black text-slate-700 mb-4 ml-2">
+        {isEnglish ? 'Change Hero Companion' : 'കൂട്ടുകാരനെ മാറ്റാം (Change Avatar)'}
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
         {AVATAR_LIST.map((avatarItem) => {
@@ -162,7 +170,9 @@ export default function Profile() {
                 {avatarItem.emoji}
               </div>
               <div className="flex-1 text-left">
-                <span className="block font-black text-slate-800 text-sm">{avatarItem.name}</span>
+                <span className="block font-black text-slate-800 text-sm">
+                  {getAvatarName(avatarItem.id, isEnglish)}
+                </span>
                 {isSelected && (
                   <span className="text-xs font-black text-candy-green flex items-center">
                     <Check size={14} className="mr-0.5" /> Selected
@@ -179,7 +189,7 @@ export default function Profile() {
         className="w-full bg-candy-red hover:bg-candy-red/90 text-white font-black py-4 rounded-2xl shadow-cartoon flex items-center justify-center space-x-2 border-4 border-white active:translate-y-1 transition-all mb-8"
       >
         <LogOut size={22} />
-        <span className="text-lg">പുറത്തുകടക്കുക (Log Out)</span>
+        <span className="text-lg">{isEnglish ? 'Log Out' : 'പുറത്തുകടക്കുക (Log Out)'}</span>
       </button>
     </div>
   );

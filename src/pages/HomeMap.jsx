@@ -9,10 +9,12 @@ import { getAvatarEmoji } from '../data/avatars';
 
 export default function HomeMap() {
   const navigate = useNavigate();
-  const { xp, progress, avatar, name } = useGame();
+  const { xp, progress, avatar, name, medium } = useGame();
   const { isMuted, setIsMuted, playSound } = useSound();
   const [selectedLand, setSelectedLand] = useState(null);
   const [avatarPos, setAvatarPos] = useState({ x: 50, y: 85 });
+
+  const isEnglish = medium === 'english';
 
   // Calculate Progress for each Land
   const getLandProgress = (landId) => {
@@ -25,8 +27,7 @@ export default function HomeMap() {
   const lands = [
     {
       id: 'maths',
-      name: 'സംഖ്യാലോകം',
-      englishName: 'Maths Factory',
+      name: isEnglish ? 'Maths Factory' : 'സംഖ്യാലോകം',
       color: 'from-amber-400 to-orange-500',
       icon: '🧮',
       x: 20,
@@ -35,8 +36,7 @@ export default function HomeMap() {
     },
     {
       id: 'malayalam',
-      name: 'തേന്മൊഴി',
-      englishName: 'Malayalam Garden',
+      name: isEnglish ? 'Malayalam Quest' : 'തേന്മൊഴി',
       color: 'from-lime-400 to-green-600',
       icon: '📝',
       x: 80,
@@ -46,7 +46,6 @@ export default function HomeMap() {
     {
       id: 'english',
       name: 'English Tent',
-      englishName: 'English Camp',
       color: 'from-indigo-400 to-blue-600',
       icon: '⛺',
       x: 50,
@@ -55,8 +54,7 @@ export default function HomeMap() {
     },
     {
       id: 'evs',
-      name: 'പൂമ്പാറ്റ',
-      englishName: 'EVS Park',
+      name: isEnglish ? 'EVS Park' : 'പൂമ്പാറ്റ',
       color: 'from-emerald-400 to-teal-600',
       icon: '🦋',
       x: 24,
@@ -65,8 +63,7 @@ export default function HomeMap() {
     },
     {
       id: 'gk',
-      name: 'ചോദ്യ കുടുക്ക',
-      englishName: 'GK Library',
+      name: isEnglish ? 'GK Library' : 'ചോദ്യ കുടുക്ക',
       color: 'from-rose-400 to-red-600',
       icon: '💡',
       x: 76,
@@ -113,8 +110,8 @@ export default function HomeMap() {
                 {getAvatarEmoji(avatar)}
               </div>
               <div className="text-left hidden sm:block">
-                <p className="font-extrabold text-slate-800 leading-tight font-chembakam">
-                  {name || 'കൂട്ടുകാരൻ'}
+                <p className="font-extrabold text-slate-800 leading-tight">
+                  {name || (isEnglish ? 'Learner' : 'കൂട്ടുകാരൻ')}
                 </p>
                 <p className="text-xs font-bold text-slate-500">CM Kids Quest</p>
               </div>
@@ -134,7 +131,7 @@ export default function HomeMap() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 className="bg-white p-3 rounded-full shadow-cartoon border-2 border-slate-100 text-slate-600 hover:bg-slate-50"
-                title={isMuted ? 'ശബ്ദം നൽകാം' : 'നിശബ്ദമാക്കാം'}
+                title={isMuted ? (isEnglish ? 'Unmute Sound' : 'ശബ്ദം നൽകാം') : (isEnglish ? 'Mute Sound' : 'നിശബ്ദമാക്കാം')}
               >
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </motion.button>
@@ -143,7 +140,7 @@ export default function HomeMap() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 className="bg-rose-500 hover:bg-rose-600 p-3 rounded-full shadow-cartoon border-2 border-white text-white"
-                title="ഹോം പേജിലേക്ക്"
+                title={isEnglish ? 'Return to Home' : 'ഹോം പേജിലേക്ക്'}
               >
                 <LogOut size={20} />
               </motion.button>
@@ -153,7 +150,7 @@ export default function HomeMap() {
 
         {/* MAP AREA */}
         <div className="flex-1 relative w-full h-full overflow-hidden">
-          {/* Map Paths (SVG) */}
+          {/* Map Paths */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-40">
             <path
               d="M 50% 85% Q 20% 60% 20% 28%"
@@ -192,7 +189,7 @@ export default function HomeMap() {
             />
           </svg>
 
-          {/* Start / Base Indicator */}
+          {/* Start Point */}
           <div className="absolute top-[85%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none">
             <div className="w-32 h-16 bg-green-600/30 rounded-[100%] blur-xl transform scale-x-150" />
             <div className="text-center font-black text-xs text-white/80 bg-black/20 px-3 py-1 rounded-full">
@@ -225,7 +222,7 @@ export default function HomeMap() {
                 <span className="text-4xl sm:text-5xl mb-1 filter drop-shadow-md transform group-hover:-translate-y-1 transition-transform">
                   {land.icon}
                 </span>
-                <span className="text-white font-black text-xs sm:text-sm drop-shadow-md bg-black/20 px-2 py-0.5 rounded-lg font-chembakam">
+                <span className="text-white font-black text-xs sm:text-sm drop-shadow-md bg-black/20 px-2 py-0.5 rounded-lg">
                   {land.name}
                 </span>
 
@@ -251,7 +248,7 @@ export default function HomeMap() {
             </motion.button>
           ))}
 
-          {/* AVATAR CHARACTER */}
+          {/* Avatar Character */}
           <motion.div
             className="absolute z-20 pointer-events-none"
             animate={{
@@ -290,10 +287,12 @@ export default function HomeMap() {
           >
             <span className="text-3xl">🎲</span>
             <div className="text-left hidden sm:block">
-              <span className="font-black text-lg block leading-tight font-chembakam">
-                Daily Mix
+              <span className="font-black text-lg block leading-tight">
+                {isEnglish ? 'Daily Mix' : 'ഡെയ്‌ലി മിക്സ്'}
               </span>
-              <span className="text-xs text-white/80 font-bold">ദിവസേനയുള്ള ചലഞ്ച്</span>
+              <span className="text-xs text-white/80 font-bold">
+                {isEnglish ? 'Daily Challenge' : 'ദിവസേനയുള്ള ചലഞ്ച്'}
+              </span>
             </div>
           </motion.button>
         </div>

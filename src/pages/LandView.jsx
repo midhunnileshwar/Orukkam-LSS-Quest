@@ -10,9 +10,10 @@ import { getAvatarEmoji } from '../data/avatars';
 export default function LandView() {
   const { landId } = useParams();
   const navigate = useNavigate();
-  const { getLevelStatus, avatar, name } = useGame();
+  const { getLevelStatus, avatar, name, medium } = useGame();
   const { playSound } = useSound();
 
+  const isEnglish = medium === 'english';
   const [openingLevel, setOpeningLevel] = useState(null);
 
   const levels = Array.from({ length: 10 }, (_, i) => {
@@ -20,7 +21,6 @@ export default function LandView() {
     return { id: levelId, status: getLevelStatus(landId, levelId) };
   });
 
-  // Find the highest active/current level to position the avatar initially
   const currentActiveLevel =
     levels.find((l) => l.status === 'current')?.id ||
     levels.find((l) => l.status === 'completed')?.id ||
@@ -30,45 +30,48 @@ export default function LandView() {
     maths: {
       bg: 'bg-amber-100',
       accent: 'text-amber-600',
-      title: 'സംഖ്യാലോകം',
+      title: isEnglish ? 'Maths Factory' : 'സംഖ്യാലോകം',
       pattern: 'radial-gradient(circle, #fbbf24 4px, transparent 4px)',
     },
     malayalam: {
       bg: 'bg-lime-100',
       accent: 'text-lime-600',
-      title: 'തേന്മൊഴി',
+      title: isEnglish ? 'Malayalam Quest' : 'തേന്മൊഴി',
       pattern: 'radial-gradient(circle, #84cc16 4px, transparent 4px)',
     },
     english: {
       bg: 'bg-indigo-100',
       accent: 'text-indigo-600',
-      title: 'English Koodaram',
+      title: 'English Tent',
       pattern: 'radial-gradient(circle, #6366f1 4px, transparent 4px)',
     },
     evs: {
       bg: 'bg-emerald-100',
       accent: 'text-emerald-600',
-      title: 'പൂമ്പാറ്റ',
+      title: isEnglish ? 'EVS Park' : 'പൂമ്പാറ്റ',
       pattern: 'radial-gradient(circle, #10b981 4px, transparent 4px)',
     },
     gk: {
       bg: 'bg-rose-100',
       accent: 'text-rose-600',
-      title: 'ചോദ്യ കുടുക്ക',
+      title: isEnglish ? 'GK Library' : 'ചോദ്യ കുടുക്ക',
       pattern: 'radial-gradient(circle, #f43f5e 4px, transparent 4px)',
     },
   }[landId];
 
   if (!theme) {
-    return <div className="text-center mt-20">Land Not Found</div>;
+    return (
+      <div className="text-center mt-20 font-bold text-slate-600">
+        {isEnglish ? 'Land Not Found' : 'മേഖല കണ്ടെത്തിയില്ല'}
+      </div>
+    );
   }
 
   const handlePlay = (levelId) => {
-    if (openingLevel) return; // Prevent double trigger
+    if (openingLevel) return;
     setOpeningLevel(levelId);
     playSound('doorOpen');
 
-    // After door opening animation, navigate into the quiz
     setTimeout(() => {
       navigate(`/quiz/${landId}/${levelId}`);
     }, 1100);
@@ -84,11 +87,12 @@ export default function LandView() {
           <button
             onClick={() => navigate('/map')}
             className="p-2 bg-slate-100 rounded-full mr-4 hover:bg-slate-200 transition"
+            title={isEnglish ? 'Back to Map' : 'മാപ്പിലേക്ക്'}
           >
             <ArrowLeft size={28} className="text-slate-700" />
           </button>
           <h1
-            className={`font-black font-malayalam ${theme.accent} ${
+            className={`font-black ${theme.accent} ${
               landId === 'maths' ? 'text-xl' : 'text-2xl'
             }`}
           >
@@ -96,11 +100,11 @@ export default function LandView() {
           </h1>
         </div>
 
-        {/* Small avatar display in header */}
+        {/* Avatar indicator in header */}
         <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
           <span className="text-2xl">{avatarEmoji}</span>
           <span className="font-bold text-xs text-slate-700 max-w-[80px] truncate">
-            {name || 'കുട്ടി'}
+            {name || (isEnglish ? 'Learner' : 'കുട്ടി')}
           </span>
         </div>
       </div>
@@ -110,7 +114,6 @@ export default function LandView() {
         className="flex-1 p-4 overflow-y-auto relative"
         style={{ backgroundImage: theme.pattern, backgroundSize: '32px 32px' }}
       >
-        {/* Path Line (SVG) */}
         <svg
           className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-30"
           viewBox="0 0 400 1200"
@@ -138,7 +141,7 @@ export default function LandView() {
                   onPlay={handlePlay}
                   hasAvatar={hasAvatar}
                   avatarEmoji={avatarEmoji}
-                  avatarName={name}
+                  avatarName={name || (isEnglish ? 'Me' : 'ഞാൻ')}
                 />
               </div>
             );
@@ -166,7 +169,6 @@ export default function LandView() {
                 className="relative w-60 h-80 bg-amber-950 rounded-t-full border-8 border-amber-600 shadow-2xl flex items-center justify-center overflow-hidden"
                 style={{ perspective: '1200px' }}
               >
-                {/* Glowing Portal inside */}
                 <div className="absolute inset-0 bg-gradient-to-t from-yellow-300 via-amber-300 to-yellow-100 flex flex-col items-center justify-center">
                   <span className="text-6xl animate-pulse">✨</span>
                   <span className="text-amber-800 font-black text-xs uppercase tracking-widest mt-2">
@@ -174,7 +176,7 @@ export default function LandView() {
                   </span>
                 </div>
 
-                {/* Left Door Leaf swinging open */}
+                {/* Left Door */}
                 <motion.div
                   initial={{ rotateY: 0 }}
                   animate={{ rotateY: -110 }}
@@ -185,7 +187,7 @@ export default function LandView() {
                   <div className="w-5 h-5 rounded-full bg-yellow-400 border-2 border-amber-950 shadow-md"></div>
                 </motion.div>
 
-                {/* Right Door Leaf swinging open */}
+                {/* Right Door */}
                 <motion.div
                   initial={{ rotateY: 0 }}
                   animate={{ rotateY: 110 }}
@@ -218,11 +220,15 @@ export default function LandView() {
                 transition={{ delay: 0.15 }}
                 className="mt-6 text-center"
               >
-                <div className="text-yellow-300 font-black text-2xl font-chembakam drop-shadow">
-                  ലെവൽ {openingLevel} തുറക്കുന്നു... 🚪✨
+                <div className="text-yellow-300 font-black text-2xl drop-shadow">
+                  {isEnglish
+                    ? `Opening Level ${openingLevel}... 🚪✨`
+                    : `ലെവൽ ${openingLevel} തുറക്കുന്നു... 🚪✨`}
                 </div>
                 <p className="text-white/90 font-bold text-sm mt-1">
-                  {name ? `${name} കളിക്കളത്തിലേക്ക് പ്രവേശിക്കുന്നു!` : 'കളിക്കളത്തിലേക്ക് പ്രവേശിക്കുന്നു!'}
+                  {isEnglish
+                    ? `${name || 'Learner'} is entering the level!`
+                    : `${name ? `${name} കളിക്കളത്തിലേക്ക് പ്രവേശിക്കുന്നു!` : 'കളിക്കളത്തിലേക്ക് പ്രവേശിക്കുന്നു!'}`}
                 </p>
               </motion.div>
             </motion.div>

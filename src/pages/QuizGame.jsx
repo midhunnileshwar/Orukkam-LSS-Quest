@@ -25,6 +25,10 @@ export default function QuizGame() {
   const { addXp, energy, loseEnergy, refillEnergy, completeLevel, name, avatar, medium } = useGame();
   const { playSound, speakUKEnglish, speakMalayalam } = useSound();
 
+  const isEnglish = medium === 'english';
+  const isEnglishTent = landId === 'english';
+  const useUKAudio = isEnglish || isEnglishTent;
+
   const [levelData, setLevelData] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [result, setResult] = useState(null);
@@ -35,13 +39,18 @@ export default function QuizGame() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [completed, setCompleted] = useState(false);
 
-  // Energy & Wrong Question Recovery
+  // Requirement 2: Tracking missed questions to enforce 100% correct answers
   const [missedQuestions, setMissedQuestions] = useState([]);
+  const [isMasteryMode, setIsMasteryMode] = useState(false);
+  const [masteryIndex, setMasteryIndex] = useState(0);
+  const [masterySelectedOption, setMasterySelectedOption] = useState(null);
+
+  // Energy Recovery State
   const [recoveryIndex, setRecoveryIndex] = useState(0);
   const [recoverySelectedOption, setRecoverySelectedOption] = useState(null);
   const [recoveredCount, setRecoveredCount] = useState(0);
 
-  // Worksheet / PDF View
+  // Printable Revision Sheet
   const [showWorksheet, setShowWorksheet] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState(30);
@@ -50,19 +59,18 @@ export default function QuizGame() {
   const [totalXpGained, setTotalXpGained] = useState(0);
 
   const isDaily = landId === 'daily' || levelId === 'mix';
-  const isEnglishTent = landId === 'english';
-  // If subject is English tent OR student selected English Medium -> UK English feedback audio
-  const useUKEnglish = isEnglishTent || medium === 'english';
 
   useEffect(() => {
-    const data = getQuestionsForLevel(landId, levelId);
+    const data = getQuestionsForLevel(landId, levelId, medium);
     setLevelData(data);
     setCurrentQuestionIndex(0);
     setCompleted(false);
     setMissedQuestions([]);
+    setIsMasteryMode(false);
+    setMasteryIndex(0);
     setRecoveryIndex(0);
     setRecoveredCount(0);
-  }, [landId, levelId]);
+  }, [landId, levelId, medium]);
 
   // Timer Countdown
   useEffect(() => {
@@ -71,6 +79,7 @@ export default function QuizGame() {
       selectedOption ||
       completed ||
       showExplanation ||
+      isMasteryMode ||
       energy <= 0
     )
       return;
@@ -87,14 +96,14 @@ export default function QuizGame() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation, energy]);
+  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation, isMasteryMode, energy]);
 
   const currentQuestion = levelData?.questions?.[currentQuestionIndex];
 
   // Auto-read question text when audio button clicked
   const handleReadQuestion = () => {
     if (!currentQuestion) return;
-    if (useUKEnglish) {
+    if (useUKAudio) {
       speakUKEnglish(currentQuestion.text);
     } else {
       speakMalayalam(currentQuestion.text);
@@ -114,7 +123,7 @@ export default function QuizGame() {
       });
     }
 
-    if (useUKEnglish) {
+    if (useUKAudio) {
       speakUKEnglish('Time is up! Let us see the right answer.');
     } else {
       speakMalayalam('സമയം കഴിഞ്ഞു! ഉത്തരം ശ്രദ്ധിക്കൂ.');
@@ -143,8 +152,7 @@ export default function QuizGame() {
       setFastAnswerBonus(isFast);
       addXp(xpAmount);
 
-      // Feedback Audio: strictly UK English for English Tent & English Medium, Malayalam otherwise
-      if (useUKEnglish) {
+      if (useUKAudio) {
         const ukPraises = [
           'Splendid! Well done!',
           'Brilliant! That is correct!',
@@ -152,8 +160,7 @@ export default function QuizGame() {
           'Outstanding! Keep it up!',
           'Spot on! Excellent!',
         ];
-        const randomPraise = ukPraises[Math.floor(Math.random() * ukPraises.length)];
-        speakUKEnglish(randomPraise);
+        speakUKEnglish(ukPraises[Math.floor(Math.random() * ukPraises.length)]);
       } else {
         const mlPraises = [
           'മിടുക്കൻ! ശരിയായ ഉത്തരം!',
@@ -161,8 +168,7 @@ export default function QuizGame() {
           'അസ്സലായിരിക്കുന്നു!',
           'ഗ്രേറ്റ് ജോബ്!',
         ];
-        const randomPraise = mlPraises[Math.floor(Math.random() * mlPraises.length)];
-        speakMalayalam(randomPraise);
+        speakMalayalam(mlPraises[Math.floor(Math.random() * mlPraises.length)]);
       }
 
       confetti({
@@ -176,7 +182,7 @@ export default function QuizGame() {
         nextQuestion();
       }, 1800);
     } else {
-      // Wrong answer
+      // Wrong answer - Log question for mastery enforcement
       if (currentQuestion) {
         setMissedQuestions((prev) => {
           if (!prev.find((q) => q.id === currentQuestion.id)) {
@@ -190,7 +196,7 @@ export default function QuizGame() {
         playSound('wrong');
         loseEnergy();
 
-        if (useUKEnglish) {
+        if (useUKAudio) {
           speakUKEnglish('Never mind! Let us check the correct answer.');
         } else {
           speakMalayalam('സാരമില്ല! നമുക്ക് ശരിയായ ഉത്തരം നോക്കാം.');
@@ -213,25 +219,96 @@ export default function QuizGame() {
     if (currentQuestionIndex < (levelData?.questions?.length || 0) - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
-      // Level Finished
-      playSound('levelUp');
-      setCompleted(true);
+      // Reached end of question list
+      // REQUIREMENT 2: Without answering 100% of questions correctly, NEVER allow moving to the next level!
+      if (missedQuestions.length > 0) {
+        // Switch to mastery mode where child must solve missed questions correctly
+        setIsMasteryMode(true);
+        setMasteryIndex(0);
+        setMasterySelectedOption(null);
+        if (useUKAudio) {
+          speakUKEnglish(
+            'You must answer all questions correctly to complete this level! Let us solve the remaining questions.'
+          );
+        } else {
+          speakMalayalam(
+            'ഈ ലെവൽ പൂർത്തിയാക്കാൻ എല്ലാ ചോദ്യങ്ങൾക്കും ശരിയായ ഉത്തരം നൽകണം! തെറ്റിയ ചോദ്യങ്ങൾ ശരിയുത്തരം നൽകി പൂർത്തിയാക്കൂ.'
+          );
+        }
+      } else {
+        // Complete Victory: 100% score achieved!
+        triggerLevelVictory();
+      }
+    }
+  };
+
+  const triggerLevelVictory = () => {
+    playSound('levelUp');
+    setCompleted(true);
+    setIsMasteryMode(false);
+    confetti({
+      particleCount: 300,
+      spread: 160,
+      origin: { y: 0.4 },
+      colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'],
+    });
+
+    if (useUKAudio) {
+      speakUKEnglish(
+        `Congratulations ${name || 'champion'}! You have answered all questions correctly and completed this level!`
+      );
+    } else {
+      speakMalayalam(`അഭിനന്ദനങ്ങൾ ${name || 'കൂട്ടുകാരാ'}! നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!`);
+    }
+
+    completeLevel(landId, levelId);
+  };
+
+  // --- REQUIREMENT 2: MASTERY SOLVING OF MISSED QUESTIONS ---
+  const activeMasteryQuestion = missedQuestions[masteryIndex];
+
+  const handleMasteryOptionClick = (optionId) => {
+    if (masterySelectedOption || !activeMasteryQuestion) return;
+    setMasterySelectedOption(optionId);
+
+    const isAnswerCorrect = optionId === activeMasteryQuestion.correct;
+    if (isAnswerCorrect) {
+      playSound('correct');
       confetti({
-        particleCount: 300,
-        spread: 160,
-        origin: { y: 0.4 },
-        colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'],
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.5 },
       });
 
-      if (useUKEnglish) {
-        speakUKEnglish(
-          `Congratulations ${name || 'champion'}! You have successfully completed this level!`
-        );
+      if (useUKAudio) {
+        speakUKEnglish('Spot on! Correct answer!');
       } else {
-        speakMalayalam(`അഭിനന്ദനങ്ങൾ ${name || 'കൂട്ടുകാരാ'}! നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!`);
+        speakMalayalam('മിടുക്കൻ! ശരിയായ ഉത്തരം!');
       }
 
-      completeLevel(landId, levelId);
+      setTimeout(() => {
+        // Remove correctly solved question from missed list
+        const remaining = missedQuestions.filter((q) => q.id !== activeMasteryQuestion.id);
+        setMissedQuestions(remaining);
+        setMasterySelectedOption(null);
+
+        if (remaining.length === 0) {
+          // All questions now 100% correctly solved!
+          triggerLevelVictory();
+        } else {
+          setMasteryIndex(0);
+        }
+      }, 1500);
+    } else {
+      playSound('wrong');
+      if (useUKAudio) {
+        speakUKEnglish('Not quite. Review the hint and try again!');
+      } else {
+        speakMalayalam('ശ്രദ്ധിക്കൂ! സഹായക്കുറിപ്പ് നോക്കി ഒന്നുകൂടി ശ്രമിക്കൂ.');
+      }
+      setTimeout(() => {
+        setMasterySelectedOption(null);
+      }, 1200);
     }
   };
 
@@ -252,7 +329,7 @@ export default function QuizGame() {
     }
   };
 
-  // --- RECOVERY MECHANIC: LEARN FROM WRONG ANSWERS TO RECHARGE ENERGY ---
+  // --- ENERGY RECOVERY HANDLERS ---
   const activeRecoveryQuestions =
     missedQuestions.length > 0 ? missedQuestions : levelData?.questions ? [levelData.questions[0]] : [];
   const activeRecoveryQuestion = activeRecoveryQuestions[recoveryIndex] || activeRecoveryQuestions[0];
@@ -274,8 +351,8 @@ export default function QuizGame() {
       const nextRecovered = recoveredCount + 1;
       setRecoveredCount(nextRecovered);
 
-      if (useUKEnglish) {
-        speakUKEnglish('Excellent! Energy recharged!');
+      if (useUKAudio) {
+        speakUKEnglish('Energy recharged!');
       } else {
         speakMalayalam('മിടുക്കൻ! ഊർജ്ജം വീണ്ടെടുത്തു!');
       }
@@ -285,7 +362,6 @@ export default function QuizGame() {
         if (recoveryIndex < activeRecoveryQuestions.length - 1) {
           setRecoveryIndex((prev) => prev + 1);
         } else {
-          // All missed questions learned and retried! Refill to full 5/5
           refillEnergy();
           setMissedQuestions([]);
           setRecoveryIndex(0);
@@ -298,8 +374,8 @@ export default function QuizGame() {
       }, 1500);
     } else {
       playSound('wrong');
-      if (useUKEnglish) {
-        speakUKEnglish('Have a look at the hint and try again!');
+      if (useUKAudio) {
+        speakUKEnglish('Review the hint and try again.');
       } else {
         speakMalayalam('സഹായക്കുറിപ്പ് നോക്കി ഒന്നുകൂടി ശ്രമിക്കൂ.');
       }
@@ -317,7 +393,6 @@ export default function QuizGame() {
   if (energy <= 0) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 text-white select-none relative overflow-hidden">
-        {/* Glowing electric background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-950/40 via-slate-950 to-slate-950 pointer-events-none" />
 
         <motion.div
@@ -325,21 +400,21 @@ export default function QuizGame() {
           animate={{ scale: 1, opacity: 1 }}
           className="bg-slate-900 border-4 border-amber-500 rounded-[2.5rem] max-w-lg w-full p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col items-center"
         >
-          {/* Energy Header */}
           <div className="relative mb-3">
             <div className="w-20 h-20 rounded-full bg-amber-500/20 border-4 border-amber-400 flex items-center justify-center text-4xl animate-bounce">
               ⚡
             </div>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-amber-400 font-malayalam text-center mb-1">
-            ഊർജ്ജം വീണ്ടെടുക്കാം!
+          <h2 className="text-2xl sm:text-3xl font-black text-amber-400 font-chembakam text-center mb-1">
+            {isEnglish ? 'Recharge Your Energy! ⚡' : 'ഊർജ്ജം വീണ്ടെടുക്കാം!'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 font-bold text-center mb-5">
-            Recharge & Learn Challenge • ശരിയായ ഉത്തരം കണ്ടെത്തി ഊർജ്ജം വീണ്ടെടുക്കൂ!
+            {isEnglish
+              ? 'Recharge & Learn Challenge • Answer correctly to regain energy!'
+              : 'Recharge & Learn Challenge • ശരിയായ ഉത്തരം കണ്ടെത്തി ഊർജ്ജം വീണ്ടെടുക്കൂ!'}
           </p>
 
-          {/* Energy Bar Indicator */}
           <div className="flex items-center space-x-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700 mb-6">
             <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-1">
               Energy:
@@ -357,28 +432,31 @@ export default function QuizGame() {
             ))}
           </div>
 
-          {/* Missed Question Card */}
           {activeRecoveryQuestion && (
             <div className="w-full bg-slate-800/90 border-2 border-slate-700 rounded-2xl p-5 mb-5 shadow-inner">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-black text-amber-400 bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-700">
-                  പഠന ചോദ്യം {recoveryIndex + 1}/{activeRecoveryQuestions.length}
+                  {isEnglish
+                    ? `Question ${recoveryIndex + 1}/${activeRecoveryQuestions.length}`
+                    : `പഠന ചോദ്യം ${recoveryIndex + 1}/${activeRecoveryQuestions.length}`}
                 </span>
-                <span className="text-xs text-slate-400 font-bold">ശരിയുത്തരം തൊടൂ 💡</span>
+                <span className="text-xs text-slate-400 font-bold">
+                  {isEnglish ? 'Touch right answer 💡' : 'ശരിയുത്തരം തൊടൂ 💡'}
+                </span>
               </div>
 
               <h3 className="text-lg sm:text-xl font-black text-white mb-3 font-chembakam leading-relaxed">
                 {activeRecoveryQuestion.text}
               </h3>
 
-              {/* Learning Hint */}
               <div className="bg-amber-950/40 border-l-4 border-amber-400 p-3 rounded-r-xl mb-4 text-xs sm:text-sm text-amber-200">
-                <span className="font-bold">💡 പഠനക്കുറിപ്പ്: </span>
+                <span className="font-bold">{isEnglish ? '💡 Learning Note: ' : '💡 പഠനക്കുറിപ്പ്: '}</span>
                 {activeRecoveryQuestion.explanation ||
-                  'ചോദ്യം ശ്രദ്ധയോടെ വായിച്ചുനോക്കി ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.'}
+                  (isEnglish
+                    ? 'Read the question carefully and choose the correct answer.'
+                    : 'ചോദ്യം ശ്രദ്ധയോടെ വായിച്ചുനോക്കി ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.')}
               </div>
 
-              {/* Options */}
               <div className="grid grid-cols-2 gap-2.5">
                 {activeRecoveryQuestion.options.map((opt) => {
                   const isChosen = recoverySelectedOption === opt.id;
@@ -409,7 +487,6 @@ export default function QuizGame() {
             </div>
           )}
 
-          {/* Quick full refill fallback button */}
           <button
             onClick={() => {
               refillEnergy();
@@ -422,14 +499,14 @@ export default function QuizGame() {
             className="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black py-3.5 px-6 rounded-2xl shadow-cartoon text-base active:translate-y-1 transition-all flex items-center justify-center space-x-2 border-2 border-white"
           >
             <RotateCcw size={20} />
-            <span>മുഴുവൻ ഊർജ്ജവും നിറച്ച് തുടരുക (Full Recharge ⚡)</span>
+            <span>{isEnglish ? 'Full Recharge & Continue (⚡)' : 'മുഴുവൻ ഊർജ്ജവും നിറച്ച് തുടരുക (Full Recharge ⚡)'}</span>
           </button>
 
           <button
             onClick={handleReturnNavigation}
             className="mt-4 text-slate-400 font-bold hover:text-white text-sm"
           >
-            ← തിരികെ മാപ്പിലേക്ക് (Return to Map)
+            {isEnglish ? '← Return to Map' : '← തിരികെ മാപ്പിലേക്ക് (Return to Map)'}
           </button>
         </motion.div>
       </div>
@@ -437,7 +514,97 @@ export default function QuizGame() {
   }
 
   // =========================================================================
-  // VIEW: LEVEL COMPLETED VICTORY SCREEN
+  // VIEW: REQUIREMENT 2 - MASTERY MODE (SOLVE ALL MISSED QUESTIONS TO PASS)
+  // =========================================================================
+  if (isMasteryMode && activeMasteryQuestion) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 text-white select-none relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-950/40 via-slate-950 to-slate-950 pointer-events-none" />
+
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-slate-900 border-4 border-indigo-500 rounded-[2.5rem] max-w-lg w-full p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col items-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-indigo-500/20 border-4 border-indigo-400 flex items-center justify-center text-3xl mb-3 animate-pulse">
+            🎯
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-black text-indigo-400 text-center mb-1 font-chembakam">
+            {isEnglish ? 'Master Remaining Questions! 🎯' : 'ബാക്കിയുള്ള ചോദ്യങ്ങൾ ശരിയാക്കൂ! 🎯'}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300 font-bold text-center mb-5">
+            {isEnglish
+              ? 'All questions must be answered correctly to complete this level!'
+              : 'ഈ ലെവൽ പൂർത്തിയാക്കാൻ എല്ലാ ചോദ്യങ്ങൾക്കും ശരിയായ ഉത്തരം നൽകണം!'}
+          </p>
+
+          <div className="w-full bg-slate-800 border-2 border-slate-700 rounded-2xl p-5 mb-5 shadow-inner">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-black text-indigo-400 bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-700">
+                {isEnglish
+                  ? `Remaining: ${missedQuestions.length}`
+                  : `ബാക്കിയുള്ള ചോദ്യങ്ങൾ: ${missedQuestions.length}`}
+              </span>
+              <span className="text-xs text-amber-300 font-bold">
+                {isEnglish ? 'Choose correct answer' : 'ശരിയുത്തരം തൊടൂ 💡'}
+              </span>
+            </div>
+
+            <h3 className="text-lg sm:text-xl font-black text-white mb-3 font-chembakam leading-relaxed">
+              {activeMasteryQuestion.text}
+            </h3>
+
+            <div className="bg-indigo-950/40 border-l-4 border-indigo-400 p-3 rounded-r-xl mb-4 text-xs sm:text-sm text-indigo-200">
+              <span className="font-bold">{isEnglish ? '💡 Hint / Learning Note: ' : '💡 പഠനക്കുറിപ്പ്: '}</span>
+              {activeMasteryQuestion.explanation ||
+                (isEnglish
+                  ? 'Think carefully and select the right answer.'
+                  : 'ചോദ്യം വീണ്ടും ശ്രദ്ധിച്ച് ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.')}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              {activeMasteryQuestion.options.map((opt) => {
+                const isChosen = masterySelectedOption === opt.id;
+                const isRightAnswer = opt.id === activeMasteryQuestion.correct;
+                let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
+
+                if (isChosen) {
+                  btnBg = isRightAnswer
+                    ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
+                    : 'bg-rose-600 text-white border-rose-400';
+                }
+
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleMasteryOptionClick(opt.id)}
+                    disabled={!!masterySelectedOption}
+                    className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
+                  >
+                    <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
+                      {opt.id.toUpperCase()}
+                    </span>
+                    <span className="line-clamp-2">{opt.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <button
+            onClick={handleReturnNavigation}
+            className="text-slate-400 hover:text-white font-bold text-sm"
+          >
+            {isEnglish ? '← Return to Map' : '← തിരികെ മാപ്പിലേക്ക് (Return to Map)'}
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW: LEVEL COMPLETED VICTORY SCREEN (ONLY REACHED UPON 100% CORRECT)
   // =========================================================================
   if (completed) {
     const nextLevel = parseInt(levelId) + 1;
@@ -445,7 +612,6 @@ export default function QuizGame() {
 
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white relative overflow-hidden p-4 sm:p-6 text-center select-none">
-        {/* Background rays */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-950/50 via-slate-950 to-slate-950 pointer-events-none" />
 
         <motion.div
@@ -464,26 +630,28 @@ export default function QuizGame() {
               {avatarEmoji}
             </motion.div>
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-400 text-slate-950 font-black text-xs px-3 py-0.5 rounded-full border border-amber-600 shadow-md whitespace-nowrap">
-              {name || 'കൂട്ടുകാരൻ'}
+              {name || (isEnglish ? 'Learner' : 'കൂട്ടുകാരൻ')}
             </div>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-black mb-1 font-chembakam text-yellow-300 drop-shadow-md">
-            അഭിനന്ദനങ്ങൾ {name || 'കൂട്ടുകാരാ'}! 🎉
+            {isEnglish
+              ? `Congratulations ${name || 'Champion'}! 🎉`
+              : `അഭിനന്ദനങ്ങൾ ${name || 'കൂട്ടുകാരാ'}! 🎉`}
           </h1>
           <p className="text-emerald-300 text-sm font-bold mb-5">
-            നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!
+            {isEnglish
+              ? 'You have answered all questions correctly and completed this level!'
+              : 'നിങ്ങൾ എല്ലാ ചോദ്യങ്ങളും ശരിയായി പൂർത്തിയാക്കി വിജയിച്ചിരിക്കുന്നു!'}
           </p>
 
           {/* XP & Door Animation Card */}
           <div className="bg-slate-900/90 border-4 border-emerald-500/80 p-6 rounded-[2.5rem] backdrop-blur-md text-center w-full shadow-2xl mb-6 relative overflow-hidden">
-            {/* Animated Door to Next Level */}
             <div className="mb-4 flex flex-col items-center">
               <div
                 className="relative w-36 h-48 bg-amber-950 rounded-t-full border-4 border-amber-500 shadow-lg flex items-center justify-center overflow-hidden"
                 style={{ perspective: '600px' }}
               >
-                {/* Glowing light inside */}
                 <div className="absolute inset-0 bg-gradient-to-t from-yellow-300 via-amber-400 to-yellow-100 flex flex-col items-center justify-center">
                   <Sparkles size={36} className="text-amber-800 animate-spin-slow" />
                   <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest mt-1">
@@ -491,7 +659,6 @@ export default function QuizGame() {
                   </span>
                 </div>
 
-                {/* Left Door */}
                 <motion.div
                   initial={{ rotateY: 0 }}
                   animate={{ rotateY: -100 }}
@@ -502,7 +669,6 @@ export default function QuizGame() {
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow"></div>
                 </motion.div>
 
-                {/* Right Door */}
                 <motion.div
                   initial={{ rotateY: 0 }}
                   animate={{ rotateY: 100 }}
@@ -513,7 +679,6 @@ export default function QuizGame() {
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow"></div>
                 </motion.div>
 
-                {/* Walking Kid Avatar */}
                 <motion.div
                   animate={{ scale: [1, 1.25, 0.4], opacity: [1, 1, 0] }}
                   transition={{ duration: 1, repeat: Infinity, repeatDelay: 2, ease: 'easeIn' }}
@@ -524,7 +689,11 @@ export default function QuizGame() {
               </div>
 
               <span className="text-xs font-black text-amber-300 mt-2 flex items-center space-x-1">
-                <span>🚪 അടുത്ത ലെവലിലേക്ക് വാതിൽ തുറക്കുന്നു...</span>
+                <span>
+                  {isEnglish
+                    ? '🚪 Door to next level is opening...'
+                    : '🚪 അടുത്ത ലെവലിലേക്ക് വാതിൽ തുറക്കുന്നു...'}
+                </span>
               </span>
             </div>
 
@@ -541,7 +710,7 @@ export default function QuizGame() {
                 onClick={handleGoToNextLevel}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all border-2 border-white flex items-center justify-center space-x-2"
               >
-                <span>അടുത്ത ലെവലിലേക്ക് (Next Level {nextLevel})</span>
+                <span>{isEnglish ? `Next Level ${nextLevel}` : `അടുത്ത ലെവലിലേക്ക് (Level ${nextLevel})`}</span>
                 <span className="text-2xl">➔</span>
               </button>
             ) : (
@@ -549,18 +718,17 @@ export default function QuizGame() {
                 onClick={handleReturnNavigation}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all border-2 border-white"
               >
-                മാപ്പിലേക്ക് തിരികെ പോകാം ➔
+                {isEnglish ? 'Back to Map ➔' : 'മാപ്പിലേക്ക് തിരികെ പോകാം ➔'}
               </button>
             )}
 
-            {/* WHAT I HAVE LEARNED / REVISION WORKSHEET PDF BUTTON */}
             <button
               onClick={() => setShowWorksheet(true)}
               className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 px-6 rounded-2xl shadow-cartoon text-base active:translate-y-1 transition-all border-2 border-indigo-300 flex items-center justify-center space-x-2"
             >
               <BookOpen size={20} />
               <span>
-                {useUKEnglish
+                {isEnglish
                   ? 'What I Have Learned (PDF / Print) 📄'
                   : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ (PDF / Print) 📄'}
               </span>
@@ -571,15 +739,13 @@ export default function QuizGame() {
                 onClick={handleReturnNavigation}
                 className="text-slate-400 hover:text-white font-bold text-sm pt-1"
               >
-                മാപ്പിലേക്ക് തിരികെ പോകാം (Back to Map)
+                {isEnglish ? 'Back to Map' : 'മാപ്പിലേക്ക് തിരികെ പോകാം (Back to Map)'}
               </button>
             )}
           </div>
         </motion.div>
 
-        {/* =========================================================================
-            WORKSHEET / REVISION SHEET MODAL WITH PRINT & SAVE PDF
-           ========================================================================= */}
+        {/* Printable Revision Worksheet Modal */}
         <AnimatePresence>
           {showWorksheet && (
             <motion.div
@@ -589,12 +755,11 @@ export default function QuizGame() {
               className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
             >
               <div className="bg-white text-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border-4 border-indigo-500">
-                {/* Modal Header (Hidden on Print) */}
                 <div className="p-4 bg-indigo-600 text-white flex items-center justify-between print:hidden">
                   <div className="flex items-center space-x-2">
                     <BookOpen size={22} />
                     <span className="font-black text-lg">
-                      {useUKEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
+                      {isEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -603,7 +768,7 @@ export default function QuizGame() {
                       className="bg-yellow-400 hover:bg-yellow-300 text-slate-900 px-4 py-2 rounded-xl font-black text-xs flex items-center space-x-1.5 shadow transition"
                     >
                       <Printer size={16} />
-                      <span>പ്രിന്റ് / സേവ് PDF</span>
+                      <span>{isEnglish ? 'Print / Save PDF' : 'പ്രിന്റ് / സേവ് PDF'}</span>
                     </button>
                     <button
                       onClick={() => setShowWorksheet(false)}
@@ -614,29 +779,26 @@ export default function QuizGame() {
                   </div>
                 </div>
 
-                {/* Printable Document Body */}
                 <div id="printable-worksheet" className="p-6 sm:p-8 overflow-y-auto space-y-6">
-                  {/* Worksheet Header */}
                   <div className="border-b-4 border-indigo-600 pb-4 text-center">
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-1 font-bold">
-                      <span>LSS Quest • Kerala Primary Learning</span>
+                      <span>LSS Quest • Primary Learning</span>
                       <span>{new Date().toLocaleDateString()}</span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-black text-indigo-700">
-                      {useUKEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
+                      {isEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
                     </h2>
                     <p className="text-sm font-bold text-slate-600 mt-1">
-                      {levelData?.title || `Level ${levelId}`} • {isEnglishTent ? 'English Tent' : landId}
+                      {levelData?.title || `Level ${levelId}`}
                     </p>
 
                     <div className="mt-3 flex items-center justify-center space-x-4 bg-indigo-50 p-2 rounded-xl text-xs sm:text-sm font-bold text-indigo-950">
-                      <span>👤 {useUKEnglish ? 'Student' : 'വിദ്യാർത്ഥി'}: {name || 'LSS Scholar'}</span>
-                      <span>⭐ XP: {totalXpGained + 50}</span>
+                      <span>👤 {isEnglish ? 'Student' : 'വിദ്യാർത്ഥി'}: {name || 'LSS Scholar'}</span>
+                      <span>⭐ Score: 100% Correct</span>
                       <span>🛡️ Status: Completed</span>
                     </div>
                   </div>
 
-                  {/* Question and Answers List */}
                   <div className="space-y-4">
                     {levelData?.questions?.map((q, idx) => {
                       const correctOpt = q.options.find((o) => o.id === q.correct);
@@ -658,7 +820,7 @@ export default function QuizGame() {
                             <div className="flex items-center space-x-2 text-emerald-700 font-black text-xs sm:text-sm bg-emerald-50 p-2 rounded-xl border border-emerald-200">
                               <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
                               <span>
-                                {useUKEnglish ? 'Correct Answer: ' : 'ശരിയായ ഉത്തരം: '}
+                                {isEnglish ? 'Correct Answer: ' : 'ശരിയായ ഉത്തരം: '}
                                 {correctOpt?.text || q.correct}
                               </span>
                             </div>
@@ -666,7 +828,7 @@ export default function QuizGame() {
                             {q.explanation && (
                               <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed font-semibold">
                                 <span className="font-bold text-indigo-600">
-                                  {useUKEnglish ? 'Learning Note: ' : 'പഠനക്കുറിപ്പ്: '}
+                                  {isEnglish ? 'Learning Note: ' : 'പഠനക്കുറിപ്പ്: '}
                                 </span>
                                 {q.explanation}
                               </p>
@@ -677,7 +839,6 @@ export default function QuizGame() {
                     })}
                   </div>
 
-                  {/* Safety & Compliance Footer */}
                   <div className="border-t-2 border-slate-200 pt-4 text-center text-[10px] text-slate-400">
                     Generated locally on student device • DPDP Act 2023 Compliant • Orukkam LSS Quest
                   </div>
@@ -696,13 +857,17 @@ export default function QuizGame() {
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="bg-slate-800 p-8 rounded-3xl border-4 border-slate-700 text-white text-xl font-bold text-center max-w-md">
           <p className="text-4xl mb-4">🚧</p>
-          <p className="mb-2">ചോദ്യങ്ങൾ തയ്യാറാകുന്നു...</p>
-          <p className="text-slate-400 text-sm mb-6">Questions coming soon for Level {levelId}</p>
+          <p className="mb-2">{isEnglish ? 'Questions preparing...' : 'ചോദ്യങ്ങൾ തയ്യാറാകുന്നു...'}</p>
+          <p className="text-slate-400 text-sm mb-6">
+            {isEnglish
+              ? `Questions coming soon for Level ${levelId}`
+              : `Level ${levelId}-ലേക്കുള്ള ചോദ്യങ്ങൾ ഉടൻ ലഭ്യമാകും`}
+          </p>
           <button
             onClick={() => navigate(-1)}
             className="bg-candy-blue text-white px-8 py-3 rounded-2xl text-base font-black shadow-cartoon hover:scale-105 active:scale-95 transition"
           >
-            ← തിരികെ പോകാം (Go Back)
+            {isEnglish ? '← Go Back' : '← തിരികെ പോകാം (Go Back)'}
           </button>
         </div>
       </div>
@@ -712,7 +877,7 @@ export default function QuizGame() {
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-black text-2xl animate-pulse">
-        ചോദ്യം ഒരുങ്ങുന്നു...
+        {isEnglish ? 'Loading Question...' : 'ചോദ്യം ഒരുങ്ങുന്നു...'}
       </div>
     );
   }
@@ -722,7 +887,6 @@ export default function QuizGame() {
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center relative overflow-hidden select-none">
-      {/* Background Patterns */}
       <div
         className="absolute inset-0 opacity-10"
         style={{
@@ -731,17 +895,16 @@ export default function QuizGame() {
         }}
       />
 
-      {/* Top Bar with Energy Bolts (⚡) instead of Hearts */}
+      {/* Top Bar with Energy Bolts */}
       <div className="w-full p-4 flex justify-between items-center text-white z-10 relative max-w-2xl">
         <button
           onClick={handleReturnNavigation}
           className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition shadow-lg border-2 border-white/10 active:scale-95"
-          title="Go Back"
+          title={isEnglish ? 'Go Back' : 'തിരികെ പോകാം'}
         >
           <ArrowLeft size={28} />
         </button>
 
-        {/* ⚡ ENERGY BOLTS (Replacing Hearts) */}
         <div className="flex items-center space-x-1.5 bg-black/50 px-3 py-2 rounded-full border border-amber-400/40 shadow-inner">
           <span className="text-xs font-black text-amber-300 mr-1 hidden sm:inline">ENERGY</span>
           {[...Array(5)].map((_, i) => (
@@ -757,7 +920,6 @@ export default function QuizGame() {
           ))}
         </div>
 
-        {/* Timer UI */}
         <div
           className={`font-mono text-xl sm:text-2xl font-black px-4 py-2 rounded-full border-2 border-white/50 shadow-cartoon transition-colors ${
             timeLeft <= 5 ? 'bg-candy-red text-white animate-pulse' : 'bg-candy-blue text-white'
@@ -766,16 +928,14 @@ export default function QuizGame() {
           ⏳ {timeLeft}s
         </div>
 
-        {/* Question Counter */}
         <div className="bg-candy-green text-white px-4 py-2 rounded-full font-black text-base sm:text-lg shadow-cartoon border-2 border-white/50">
           {currentQuestionIndex + 1}/{levelData?.questions?.length || 0}
         </div>
       </div>
 
-      {/* Question Card (The Machine Screen) */}
+      {/* Question Card */}
       <div className="flex-1 w-full max-w-lg px-4 py-2 flex flex-col justify-center relative z-10">
         <div className="bg-slate-800 border-[6px] border-slate-600 rounded-[2rem] p-6 mb-6 shadow-2xl relative overflow-hidden transform rotate-0.5">
-          {/* Machine Bolts */}
           <div className="absolute top-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
           <div className="absolute top-3 right-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
           <div className="absolute bottom-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
@@ -790,7 +950,7 @@ export default function QuizGame() {
               className="flex items-center space-x-1 bg-indigo-600/80 hover:bg-indigo-500 text-white px-3 py-1 rounded-full text-xs font-bold active:scale-95 transition"
             >
               <Volume2 size={16} />
-              <span>{useUKEnglish ? 'Listen' : 'വായിക്കാം'}</span>
+              <span>{isEnglish ? 'Listen' : 'വായിക്കാം'}</span>
             </button>
           </div>
 
@@ -813,7 +973,6 @@ export default function QuizGame() {
             />
           ))}
 
-          {/* Floating XP Animation */}
           <AnimatePresence>
             {selectedOption && isCorrect && (
               <motion.div
@@ -838,7 +997,7 @@ export default function QuizGame() {
         </div>
       </div>
 
-      {/* Explanation Modal (The Did You Know / Repair Card) */}
+      {/* Explanation Modal */}
       <AnimatePresence>
         {showExplanation && (
           <motion.div
@@ -853,14 +1012,14 @@ export default function QuizGame() {
             <div className="flex items-center space-x-3 mb-3">
               <Zap className="text-candy-red fill-current animate-pulse" size={28} />
               <h3 className="text-2xl font-black text-slate-800">
-                {useUKEnglish ? 'Let us check the answer! 💡' : 'ശരിയായ ഉത്തരം നോക്കാം! 💡'}
+                {isEnglish ? 'Let us check the answer! 💡' : 'ശരിയായ ഉത്തരം നോക്കാം! 💡'}
               </h3>
             </div>
 
             <p className="text-slate-700 text-base sm:text-lg font-bold mb-6 leading-relaxed bg-red-50 p-4 rounded-2xl border-l-4 border-candy-red">
               {currentQuestion.explanation ||
-                (useUKEnglish
-                  ? 'Good try! Keep going for the next question.'
+                (isEnglish
+                  ? 'Good try! Look at the explanation carefully.'
                   : 'ശ്രമിച്ചത് നല്ല കാര്യം! അടുത്ത ചോദ്യത്തിൽ കൂടുതൽ ശ്രദ്ധിക്കാം.')}
             </p>
 
@@ -868,7 +1027,7 @@ export default function QuizGame() {
               onClick={nextQuestion}
               className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-black py-4 rounded-2xl shadow-cartoon text-xl active:translate-y-1 border-b-4 border-green-700 transition-all"
             >
-              തുടരാം ➔ (Continue)
+              {isEnglish ? 'Continue ➔' : 'തുടരാം ➔ (Continue)'}
             </button>
           </motion.div>
         )}

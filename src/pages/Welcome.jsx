@@ -10,8 +10,17 @@ import TeacherAuth from '../components/TeacherAuth';
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { loginWithGoogle, playAsGuest, registerWithEmail, loginWithEmail, isRegistered } = useGame();
-  const { playSound, speakText } = useSound();
+  const {
+    loginWithGoogle,
+    playAsGuest,
+    registerWithEmail,
+    loginWithEmail,
+    isRegistered,
+    medium,
+  } = useGame();
+  const { playSound, speakUKEnglish, speakMalayalam } = useSound();
+
+  const isEnglish = medium === 'english';
 
   const [showLogin, setShowLogin] = useState(false);
   const [authMode, setAuthMode] = useState('choose'); // 'choose', 'email-login', 'email-register'
@@ -50,7 +59,11 @@ export default function Welcome() {
       colors: ['#FFD700', '#FF69B4', '#00BFFF', '#4ade80'],
     });
 
-    speakText('ഒരുക്കം ക്വസ്റ്റിലേക്ക് സ്വാഗതം!');
+    if (isEnglish) {
+      speakUKEnglish('Welcome to Orukkam LSS Quest!');
+    } else {
+      speakMalayalam('ഒരുക്കം ക്വസ്റ്റിലേക്ക് സ്വാഗതം!');
+    }
 
     // If device already registered, go straight to the game map!
     if (isRegistered) {
@@ -63,15 +76,29 @@ export default function Welcome() {
   };
 
   const getFriendlyErrorMessage = (errorMsg) => {
-    if (!errorMsg) return "An unknown error occurred.";
-    if (errorMsg.includes('auth/invalid-email')) return "Please enter a valid email address. (ശരിയായ ഇമെയിൽ നൽകുക)";
-    if (errorMsg.includes('auth/email-already-in-use')) return "This email is already registered. Try logging in.";
-    if (errorMsg.includes('auth/weak-password')) return "Password must be at least 6 characters long.";
-    if (errorMsg.includes('auth/wrong-password') || errorMsg.includes('auth/invalid-credential') || errorMsg.includes('auth/user-not-found')) {
-      return "Incorrect email or password. (തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ്)";
+    if (!errorMsg) return 'An unknown error occurred.';
+    if (errorMsg.includes('auth/invalid-email')) {
+      return isEnglish
+        ? 'Please enter a valid email address.'
+        : 'ശരിയായ ഇമെയിൽ നൽകുക (Please enter a valid email)';
     }
-    if (errorMsg.includes('auth/popup-closed-by-user')) return "Sign-in was cancelled.";
-    return "Login Failed. Please try again.";
+    if (errorMsg.includes('auth/email-already-in-use')) {
+      return 'This email is already registered. Try logging in.';
+    }
+    if (errorMsg.includes('auth/weak-password')) {
+      return 'Password must be at least 6 characters long.';
+    }
+    if (
+      errorMsg.includes('auth/wrong-password') ||
+      errorMsg.includes('auth/invalid-credential') ||
+      errorMsg.includes('auth/user-not-found')
+    ) {
+      return isEnglish
+        ? 'Incorrect email or password.'
+        : 'തെറ്റായ ഇമെയിൽ അല്ലെങ്കിൽ പാസ്‌വേഡ് (Incorrect email or password)';
+    }
+    if (errorMsg.includes('auth/popup-closed-by-user')) return 'Sign-in was cancelled.';
+    return 'Login Failed. Please try again.';
   };
 
   const executeAuth = async (authFunction, ...args) => {
@@ -99,7 +126,7 @@ export default function Welcome() {
 
   const handleEmailAction = () => {
     if (!email || !password) {
-      setAuthError("Please enter email and password.");
+      setAuthError('Please enter email and password.');
       return;
     }
     if (authMode === 'email-register') {
@@ -114,7 +141,7 @@ export default function Welcome() {
       <Background>
         {/* --- Main Content --- */}
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 select-none">
-          {/* Title Section (Anek Malayalam Typography) */}
+          {/* Title Section */}
           <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -124,7 +151,11 @@ export default function Welcome() {
             onMouseUp={handleLogoPressEnd}
             onTouchStart={handleLogoPressStart}
             onTouchEnd={handleLogoPressEnd}
-            title="അധ്യാപകർക്ക്: ടൈറ്റിലിൽ 3 സെക്കൻഡ് അമർത്തിപ്പിടിക്കുക (Long press for Teacher Mode)"
+            title={
+              isEnglish
+                ? 'Teachers: Long press for 3 seconds for Teacher Mode'
+                : 'അധ്യാപകർക്ക്: ടൈറ്റിലിൽ 3 സെക്കൻഡ് അമർത്തിപ്പിടിക്കുക (Long press for Teacher Mode)'
+            }
           >
             <motion.div
               animate={{ y: [0, -8, 0] }}
@@ -134,12 +165,14 @@ export default function Welcome() {
                 className="text-7xl sm:text-8xl md:text-9xl font-extrabold text-white drop-shadow-[0_8px_12px_rgba(0,0,0,0.35)] tracking-normal font-malayalam"
                 style={{ WebkitTextStroke: '2px #1e293b' }}
               >
-                ഒരുക്കം
+                {isEnglish ? 'ORUKKAM' : 'ഒരുക്കം'}
               </h1>
             </motion.div>
             <div className="mt-3 bg-white/95 px-6 py-2 rounded-full shadow-lg border-2 border-white transform -rotate-1">
-              <p className="text-base sm:text-lg font-black text-slate-800 font-malayalam">
-                CM Kids Quest • LSS വിജയത്തിലേക്കുള്ള ചുവട് 🚀
+              <p className="text-base sm:text-lg font-black text-slate-800">
+                {isEnglish
+                  ? 'CM Kids Quest • Your Step to LSS Success 🚀'
+                  : 'CM Kids Quest • LSS വിജയത്തിലേക്കുള്ള ചുവട് 🚀'}
               </p>
             </div>
           </motion.div>
@@ -160,16 +193,24 @@ export default function Welcome() {
                 >
                   <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping pointer-events-none" />
                   <Play size={76} fill="white" className="text-white ml-2 drop-shadow-md" />
-                  <span className="absolute -bottom-14 text-xl sm:text-2xl font-black text-slate-800 bg-white/95 px-5 py-1.5 rounded-2xl shadow-cartoon font-malayalam">
-                    {isRegistered ? 'തുടരാം! (CONTINUE)' : 'കളിക്കാം! (START)'}
+                  <span className="absolute -bottom-14 text-xl sm:text-2xl font-black text-slate-800 bg-white/95 px-5 py-1.5 rounded-2xl shadow-cartoon whitespace-nowrap">
+                    {isEnglish
+                      ? isRegistered
+                        ? 'CONTINUE'
+                        : 'START'
+                      : isRegistered
+                      ? 'തുടരാം! (CONTINUE)'
+                      : 'കളിക്കാം! (START)'}
                   </span>
                 </motion.button>
 
-                {/* Kerala Cyber Safety Notice Badge */}
+                {/* Cyber Safety Notice Badge */}
                 <div className="mt-20 max-w-sm bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-2xl border border-white shadow-md text-center flex items-center space-x-2">
                   <ShieldCheck size={20} className="text-emerald-600 flex-shrink-0" />
                   <p className="text-[11px] font-bold text-slate-700 leading-tight">
-                    DPDP Act 2023 & Kerala Cyber Safety അനുസരിച്ച് കുട്ടികളുടെ വിവരങ്ങൾ പൂർണ്ണമായി ഉപകരണത്തിൽ മാത്രം സുരക്ഷിതം.
+                    {isEnglish
+                      ? 'Protected by DPDP Act 2023 & Cyber Safety. Student data is stored safely on this device only.'
+                      : 'DPDP Act 2023 & Kerala Cyber Safety അനുസരിച്ച് കുട്ടികളുടെ വിവരങ്ങൾ പൂർണ്ണമായി ഉപകരണത്തിൽ മാത്രം സുരക്ഷിതം.'}
                   </p>
                 </div>
               </div>
@@ -191,8 +232,8 @@ export default function Welcome() {
 
                 {authMode === 'choose' ? (
                   <>
-                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-malayalam">
-                      തുടങ്ങാം! (Let&apos;s Start!)
+                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6">
+                      {isEnglish ? "Let's Start!" : 'തുടങ്ങാം! (Let’s Start!)'}
                     </h2>
 
                     <button
@@ -200,12 +241,18 @@ export default function Welcome() {
                       disabled={loading}
                       className="w-full bg-candy-blue hover:bg-candy-blue/90 text-white font-bold py-4 px-6 rounded-2xl flex items-center justify-center mb-3 shadow-[0_6px_0_0_#2563eb] active:translate-y-1 active:shadow-none transition-all"
                     >
-                      <span className="text-xl font-malayalam">🚀 ലോഗിൻ ചെയ്യാതെ കളിക്കാം (Play as Guest)</span>
+                      <span className="text-xl">
+                        {isEnglish
+                          ? '🚀 Play as Guest (No Login Required)'
+                          : '🚀 ലോഗിൻ ചെയ്യാതെ കളിക്കാം (Play as Guest)'}
+                      </span>
                     </button>
 
                     <div className="relative flex py-4 items-center">
                       <div className="flex-grow border-t border-slate-200"></div>
-                      <span className="flex-shrink-0 mx-4 text-slate-400 font-bold text-sm">അല്ലെങ്കിൽ (OR)</span>
+                      <span className="flex-shrink-0 mx-4 text-slate-400 font-bold text-sm">
+                        {isEnglish ? 'OR' : 'അല്ലെങ്കിൽ (OR)'}
+                      </span>
                       <div className="flex-grow border-t border-slate-200"></div>
                     </div>
 
@@ -220,7 +267,7 @@ export default function Welcome() {
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
-                      <span>Google വഴി (Parent Login)</span>
+                      <span>{isEnglish ? 'Parent Login via Google' : 'Google വഴി (Parent Login)'}</span>
                     </button>
 
                     <button
@@ -228,13 +275,19 @@ export default function Welcome() {
                       disabled={loading}
                       className="w-full bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-2xl mb-4 transition-all"
                     >
-                      📧 രക്ഷിതാവിന്റെ ഇമെയിൽ വഴി
+                      {isEnglish ? '📧 Parent Login via Email' : '📧 രക്ഷിതാവിന്റെ ഇമെയിൽ വഴി'}
                     </button>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6 font-malayalam">
-                      {authMode === 'email-register' ? 'രക്ഷിതാവിന്റെ പുതിയ അക്കൗണ്ട്' : 'ഇമെയിൽ ലോഗിൻ'}
+                    <h2 className="text-2xl font-black text-slate-700 text-center mb-6">
+                      {authMode === 'email-register'
+                        ? isEnglish
+                          ? "Parent's New Account"
+                          : 'രക്ഷിതാവിന്റെ പുതിയ അക്കൗണ്ട്'
+                        : isEnglish
+                        ? 'Parent Email Login'
+                        : 'ഇമെയിൽ ലോഗിൻ'}
                     </h2>
 
                     <input
@@ -255,14 +308,30 @@ export default function Welcome() {
                     <button
                       onClick={handleEmailAction}
                       disabled={loading}
-                      className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-bold py-4 px-6 rounded-2xl mb-3 shadow-[0_6px_0_0_#16a34a] active:translate-y-1 active:shadow-none transition-all text-xl font-malayalam"
+                      className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-bold py-4 px-6 rounded-2xl mb-3 shadow-[0_6px_0_0_#16a34a] active:translate-y-1 active:shadow-none transition-all text-xl"
                     >
-                      {loading ? 'കാത്തിരിക്കൂ...' : (authMode === 'email-register' ? 'രജിസ്റ്റർ ചെയ്യുക' : 'ലോഗിൻ ചെയ്യുക')}
+                      {loading
+                        ? isEnglish
+                          ? 'Please wait...'
+                          : 'കാത്തിരിക്കൂ...'
+                        : authMode === 'email-register'
+                        ? isEnglish
+                          ? 'Register'
+                          : 'രജിസ്റ്റർ ചെയ്യുക'
+                        : isEnglish
+                        ? 'Login'
+                        : 'ലോഗിൻ ചെയ്യുക'}
                     </button>
 
                     <div className="text-center mt-4">
                       <span className="text-slate-500 font-semibold text-sm">
-                        {authMode === 'email-register' ? 'അക്കൗണ്ട് ഉണ്ടോ? ' : 'പുതിയ ആളാണോ? '}
+                        {authMode === 'email-register'
+                          ? isEnglish
+                            ? 'Already have an account? '
+                            : 'അക്കൗണ്ട് ഉണ്ടോ? '
+                          : isEnglish
+                          ? 'New here? '
+                          : 'പുതിയ ആളാണോ? '}
                       </span>
                       <button
                         onClick={() => {
@@ -271,7 +340,13 @@ export default function Welcome() {
                         }}
                         className="text-candy-blue font-bold hover:underline"
                       >
-                        {authMode === 'email-register' ? 'ലോഗിൻ ചെയ്യുക' : 'രജിസ്റ്റർ ചെയ്യുക'}
+                        {authMode === 'email-register'
+                          ? isEnglish
+                            ? 'Login'
+                            : 'ലോഗിൻ ചെയ്യുക'
+                          : isEnglish
+                          ? 'Register'
+                          : 'രജിസ്റ്റർ ചെയ്യുക'}
                       </button>
                     </div>
                   </>
