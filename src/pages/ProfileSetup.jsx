@@ -6,6 +6,7 @@ import { useSound } from '../context/SoundContext';
 import { ArrowRight, Volume2, ShieldCheck, Lock, CheckCircle2, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AVATAR_LIST, getAvatarName } from '../data/avatars';
+import { validateName, sanitizeText, isHumanInteraction } from '../utils/security';
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
@@ -36,6 +37,10 @@ export default function ProfileSetup() {
   const [studentName, setStudentName] = useState(currentName || '');
   const [selectedAvatar, setSelectedAvatar] = useState('tiger');
 
+  // Input Validation & Bot Trapping State
+  const [nameError, setNameError] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+
   useEffect(() => {
     if (step === 1) {
       if (isEnglish) {
@@ -64,26 +69,52 @@ export default function ProfileSetup() {
     }
   }, [step, isEnglish]);
 
-  const handleNext = () => {
+  const handleNext = (e) => {
+    // Bot check: block synthetic / automated dispatch events
+    if (e && !isHumanInteraction(e)) return;
+    // Honeypot trap: if filled, automated bot is running
+    if (honeypot.trim()) return;
+
     playSound('pop');
     if (step === 1 && selectedMedium) {
       setStep(2);
-    } else if (step === 2 && parentName.trim() && consentChecked) {
-      setStep(3);
-    } else if (step === 3 && studentName.trim()) {
+      setNameError('');
+    } else if (step === 2) {
+      const val = validateName(parentName);
+      if (!val.isValid) {
+        setNameError(val.error);
+        return;
+      }
+      setNameError('');
+      if (consentChecked) {
+        setStep(3);
+      }
+    } else if (step === 3) {
+      const val = validateName(studentName);
+      if (!val.isValid) {
+        setNameError(val.error);
+        return;
+      }
+      setNameError('');
       setStep(4);
     } else if (step === 4 && selectedAvatar) {
-      handleFinish();
+      handleFinish(e);
     }
   };
 
-  const handleFinish = async () => {
+  const handleFinish = async (e) => {
+    if (e && !isHumanInteraction(e)) return;
+    if (honeypot.trim()) return;
+
     playSound('correct');
+    const sanitizedParent = sanitizeText(parentName, 40);
+    const sanitizedStudent = sanitizeText(studentName, 40) || (isEnglish ? 'Scholar' : 'കുട്ടി');
+
     await saveProfile({
-      parentName: parentName.trim(),
+      parentName: sanitizedParent,
       parentConsent: true,
       medium: selectedMedium,
-      name: studentName.trim() || (isEnglish ? 'Scholar' : 'കുട്ടി'),
+      name: sanitizedStudent,
       avatar: selectedAvatar,
       isNew: false,
     });
@@ -242,12 +273,19 @@ export default function ProfileSetup() {
                 </label>
                 <input
                   type="text"
+                  maxLength={40}
                   value={parentName}
-                  onChange={(e) => setParentName(e.target.value)}
+                  onChange={(e) => {
+                    setParentName(e.target.value);
+                    setNameError('');
+                  }}
                   placeholder={isEnglish ? 'Parent Name...' : 'പേര് നൽകൂ...'}
                   className="w-full bg-slate-800 border-2 border-slate-600 focus:border-emerald-400 rounded-xl p-3.5 text-white font-bold outline-none text-base"
                   autoFocus
                 />
+                {nameError && step === 2 && (
+                  <p className="text-red-400 text-xs font-bold mt-1.5">{nameError}</p>
+                )}
               </div>
 
               <label className="flex items-start space-x-3 cursor-pointer bg-slate-800/60 p-3.5 rounded-xl border border-slate-700 hover:border-slate-500 transition">
@@ -284,12 +322,22 @@ export default function ProfileSetup() {
 
             <input
               type="text"
+              maxLength={40}
               value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
+              onChange={(e) => {
+                setStudentName(e.target.value);
+                setNameError('');
+              }}
               className="w-full text-center text-3xl sm:text-4xl p-5 rounded-3xl text-slate-800 font-black outline-none border-6 border-white/50 focus:border-yellow-400 shadow-2xl placeholder:text-slate-300"
               placeholder={isEnglish ? 'Enter nickname...' : 'പേര് നൽകൂ...'}
               autoFocus
             />
+
+            {nameError && step === 3 && (
+              <p className="text-red-200 bg-red-900/60 border border-red-500/50 py-1.5 px-3 rounded-xl text-xs font-bold mt-3 inline-block">
+                {nameError}
+              </p>
+            )}
 
             <button
               onClick={() => {
@@ -353,7 +401,7 @@ export default function ProfileSetup() {
               (step === 3 && !studentName.trim()) ||
               (step === 4 && !selectedAvatar)
             }
-            onClick={handleNext}
+            onClick={(e) => handleNext(e)}
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
             className="bg-yellow-400 text-purple-900 px-8 py-4 rounded-full font-black text-lg flex items-center space-x-2 shadow-[0_6px_0_rgb(180,83,9)] active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed transition-all"
@@ -384,6 +432,17 @@ export default function ProfileSetup() {
             )}
           </motion.button>
         </div>
+        {/* Bot Trap Honeypot (Invisible to humans, triggers if populated by bot automation) */}
+        <input
+          type="text"
+          name="user_agent_verification"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+          tabIndex="-1"
+          autoComplete="off"
+          className="opacity-0 absolute pointer-events-none -z-50 h-0 w-0"
+          aria-hidden="true"
+        />
       </motion.div>
     </div>
   );

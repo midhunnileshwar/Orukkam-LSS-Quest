@@ -10,8 +10,16 @@ import {
   CheckCircle,
   Trash2,
   BookOpen,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import {
+  clearTeacherSession,
+  sanitizeText,
+  validateSheetUrl,
+  sha256,
+} from '../utils/security';
 
 const SUBJECTS = [
   { id: 'maths', name: 'സംഖ്യാലോകം (Maths)' },
@@ -99,7 +107,7 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
         .filter(Boolean);
       if (lines.length === 0) return;
 
-      let questionText = lines[0].replace(/^\d+[.)-]\s*/, '').trim();
+      let questionText = sanitizeText(lines[0].replace(/^\d+[.)-]\s*/, '').trim(), 300);
       const options = [];
       let correct = 'a';
       let explanation = '';
@@ -115,11 +123,11 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
         if (ansMatch) {
           correct = ansMatch[1].toLowerCase();
         } else if (expMatch) {
-          explanation = expMatch[1].trim();
+          explanation = sanitizeText(expMatch[1].trim(), 300);
         } else if (optMatch) {
           options.push({
             id: optMatch[1].toLowerCase(),
-            text: optMatch[2].trim(),
+            text: sanitizeText(optMatch[2].trim(), 150),
           });
         }
       });
@@ -178,17 +186,38 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
   };
 
   const handleSyncSheet = () => {
-    if (!sheetUrl.trim()) {
-      setSheetMessage('Please enter a Google Sheet URL.');
+    const valResult = validateSheetUrl(sheetUrl);
+    if (!valResult.isValid) {
+      setSheetMessage(valResult.error);
       return;
     }
     setSheetMessage('Connecting to Google Sheet... (Requires public CSV publish link)');
     setTimeout(() => {
-      setSheetMessage('Sheet link saved! Questions will be imported during network sync.');
+      setSheetMessage('Verified secure Google Sheet URL! Questions will be imported during network sync.');
     }, 1000);
   };
 
+  // Custom Teacher PIN change state
+  const [newPin, setNewPin] = useState('');
+  const [pinChangeMsg, setPinChangeMsg] = useState({ type: '', text: '' });
+
+  const handleUpdatePin = async () => {
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinChangeMsg({ type: 'error', text: 'PIN must be exactly 4 digits (0-9).' });
+      return;
+    }
+    const hash = await sha256(newPin);
+    localStorage.setItem('orukkam_teacher_pin_hash', hash);
+    setPinChangeMsg({
+      type: 'success',
+      text: 'Teacher PIN updated securely! Use this new PIN for future logins.',
+    });
+    setNewPin('');
+    setTimeout(() => setPinChangeMsg({ type: '', text: '' }), 4000);
+  };
+
   const handleLogout = () => {
+    clearTeacherSession();
     logout();
     navigate('/');
   };
@@ -251,6 +280,18 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
           >
             <FileSpreadsheet size={20} />
             <span>Magic Sheet (Google Docs)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('security-settings')}
+            className={`w-full flex items-center space-x-3 p-3.5 rounded-2xl font-bold transition-all ${
+              activeTab === 'security-settings'
+                ? 'bg-indigo-600 text-white shadow-lg'
+                : 'hover:bg-slate-800 text-slate-400'
+            }`}
+          >
+            <KeyRound size={20} />
+            <span>PIN & Security</span>
           </button>
 
           <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 mt-6 text-sm">
@@ -462,6 +503,109 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
                 <div className="font-mono bg-black/40 p-3 rounded-lg overflow-x-auto text-slate-300">
                   Question | Option A | Option B | Option C | Option D | Correct (A/B/C/D) |
                   Explanation
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* --- SECURITY & PIN SETTINGS VIEW --- */}
+          {activeTab === 'security-settings' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-slate-800 rounded-2xl p-6 border border-slate-700 space-y-6"
+            >
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="w-12 h-12 bg-indigo-600/30 text-indigo-400 rounded-2xl flex items-center justify-center border border-indigo-500/40">
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Teacher Security & Access Control</h2>
+                  <p className="text-slate-400 text-xs">
+                    Configure your secure 4-digit PIN and review local protection status
+                  </p>
+                </div>
+              </div>
+
+              {/* PIN Change Box */}
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-700 space-y-4">
+                <h3 className="font-bold text-white text-sm flex items-center space-x-2">
+                  <KeyRound size={16} className="text-indigo-400" />
+                  <span>Update Teacher Security PIN</span>
+                </h3>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Set a unique 4-digit numeric PIN for the Teacher Dashboard. Your PIN is securely
+                  hashed using SHA-256 and never stored in plain text.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter new 4-digit PIN"
+                    className="w-48 bg-slate-800 border border-slate-600 rounded-xl p-3 text-white font-mono text-center tracking-widest text-lg outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    onClick={handleUpdatePin}
+                    disabled={newPin.length !== 4}
+                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-xl transition shadow-md flex items-center justify-center space-x-2"
+                  >
+                    <span>Update Security PIN</span>
+                  </button>
+                </div>
+
+                {pinChangeMsg.text && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-bold ${
+                      pinChangeMsg.type === 'success'
+                        ? 'bg-green-950 border border-green-500 text-green-300'
+                        : 'bg-red-950 border border-red-500 text-red-300'
+                    }`}
+                  >
+                    {pinChangeMsg.text}
+                  </div>
+                )}
+              </div>
+
+              {/* Security Hardening Status */}
+              <div className="bg-slate-900/60 rounded-2xl p-5 border border-slate-700 space-y-3">
+                <h3 className="font-bold text-slate-300 text-xs uppercase tracking-wider">
+                  Active Hardening & Protection Policies:
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 flex items-start space-x-2.5">
+                    <span className="text-green-400 font-bold">✓</span>
+                    <div>
+                      <span className="font-bold text-white block">Anti-Inspect & Copy Lock</span>
+                      <span className="text-slate-400">Right-click, F12, DevTools shortcuts blocked</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 flex items-start space-x-2.5">
+                    <span className="text-green-400 font-bold">✓</span>
+                    <div>
+                      <span className="font-bold text-white block">Rate Limiting & Lockout</span>
+                      <span className="text-slate-400">5-attempt lockout (15-min cooldown)</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 flex items-start space-x-2.5">
+                    <span className="text-green-400 font-bold">✓</span>
+                    <div>
+                      <span className="font-bold text-white block">Bot & Automation Deterrent</span>
+                      <span className="text-slate-400">Headless browser detection & human event validation</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 flex items-start space-x-2.5">
+                    <span className="text-green-400 font-bold">✓</span>
+                    <div>
+                      <span className="font-bold text-white block">DPDP Act 2023 Sec 9 Compliance</span>
+                      <span className="text-slate-400">Offline-first local storage, zero remote child telemetry</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>

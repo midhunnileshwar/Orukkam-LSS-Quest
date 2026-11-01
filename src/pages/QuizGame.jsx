@@ -18,6 +18,7 @@ import { useSound } from '../context/SoundContext';
 import { getQuestionsForLevel } from '../data/questions';
 import { getAvatarEmoji } from '../data/avatars';
 import confetti from 'canvas-confetti';
+import { isHumanInteraction, checkRateLimit } from '../utils/security';
 
 export default function QuizGame() {
   const { landId, levelId } = useParams();
@@ -133,7 +134,17 @@ export default function QuizGame() {
     setShowExplanation(true);
   };
 
-  const handleOptionClick = (optionId) => {
+  const handleOptionClick = (optionId, event) => {
+    // Bot check: block synthetic / automated browser dispatch events
+    if (event && !isHumanInteraction(event)) {
+      return;
+    }
+
+    // Rate limiting: throttle clicks (minimum 400ms cooldown)
+    if (!checkRateLimit('quiz_option_click', 1, 400)) {
+      return;
+    }
+
     if (selectedOption || showExplanation) return;
 
     setSelectedOption(optionId);
@@ -968,7 +979,7 @@ export default function QuizGame() {
               text={option.text}
               isSelected={selectedOption === option.id}
               result={selectedOption === option.id ? result : null}
-              onClick={() => handleOptionClick(option.id)}
+              onClick={(e) => handleOptionClick(option.id, e)}
               disabled={!!selectedOption || showExplanation}
             />
           ))}

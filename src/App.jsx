@@ -7,12 +7,19 @@ import Profile from './pages/Profile';
 import Welcome from './pages/Welcome';
 import ProfileSetup from './pages/ProfileSetup';
 import TeacherDashboard from './pages/TeacherDashboard';
+import TeacherRouteGuard from './components/TeacherRouteGuard';
+import { initContentProtection } from './utils/security';
 
 import { GameProvider } from './context/GameContext';
 import { SoundProvider } from './context/SoundContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
+  // Initialize client content protection (anti-scrape, inspect-mode lock)
+  useEffect(() => {
+    initContentProtection();
+  }, []);
+
   // Clear any existing URL hashes or query strings so page addresses are never exposed or shared
   useEffect(() => {
     try {
@@ -26,11 +33,18 @@ function AppContent() {
 
   return (
     <Router initialEntries={['/']}>
-      <div className="min-h-screen bg-orukkam-green/10 text-slate-900 font-sans">
+      <div className="min-h-screen bg-orukkam-green/10 text-slate-900 font-sans select-none">
         <Routes>
           <Route path="/" element={<Welcome />} />
           <Route path="/setup" element={<ProfileSetup />} />
-          <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+          <Route
+            path="/teacher-dashboard"
+            element={
+              <TeacherRouteGuard>
+                <TeacherDashboard />
+              </TeacherRouteGuard>
+            }
+          />
           <Route path="/map" element={<HomeMap />} />
           <Route path="/land/:landId" element={<LandView />} />
           <Route path="/quiz/:landId/:levelId" element={<QuizGame />} />

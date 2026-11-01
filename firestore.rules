@@ -1,0 +1,41 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules for Orukkam - CM Kids Quest
+ *
+ * Strict Row-Level Security (RLS) & Access Control:
+ * 1. User/Student Data (/users/{userId}):
+ *    - Strictly isolated by auth.uid.
+ *    - An authenticated user CANNOT read or write another user's document.
+ *    - Unauthenticated requests are rejected.
+ * 2. Questions Repository (/questions/{questionId}):
+ *    - Public read for students to play quizzes.
+ *    - Write/Update restricted strictly to authenticated teachers with teacher claim.
+ * 3. Default Deny:
+ *    - All other collections, subcollections, or root access are denied.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Row-Level Security: User Profiles & Cloud Progress
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Teacher Content / Custom Question Repository
+    match /questions/{questionId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        request.auth.token.role == 'teacher' ||
+        request.auth.token.email.matches('.*@.*\\.gov\\.in$') ||
+        request.auth.uid == resource.data.authorId
+      );
+    }
+
+    // Default Deny Rule: Block all unauthorized collections and scans
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -18,6 +18,27 @@ body {
   background-size: 32px 32px;
 }
 
+/* Security & Anti-Scraping Protection: Prevent text selection & copying */
+*, *::before, *::after {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* Custom Glass Panel for Kids */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);

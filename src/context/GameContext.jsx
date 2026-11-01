@@ -7,10 +7,10 @@ import {
 } from "firebase/auth";
 import {
   doc,
-  setDoc,
   updateDoc,
   onSnapshot
 } from "firebase/firestore";
+import { sanitizeText, checkRateLimit } from '../utils/security';
 
 const GameContext = createContext();
 
@@ -227,18 +227,21 @@ export const GameProvider = ({ children }) => {
   // Save profile and lock in device registration
   const saveProfile = async (profileData) => {
     setIsRegistered(true);
-    if (profileData.name) setName(profileData.name);
+    const cleanName = sanitizeText(profileData.name || name, 40);
+    const cleanParentName = sanitizeText(profileData.parentName || parentName, 40);
+
+    if (profileData.name) setName(cleanName);
     if (profileData.avatar) setAvatar(profileData.avatar);
-    if (profileData.parentName) setParentName(profileData.parentName);
+    if (profileData.parentName) setParentName(cleanParentName);
     if (profileData.parentConsent !== undefined) setParentConsent(profileData.parentConsent);
     if (profileData.medium) setMedium(profileData.medium);
 
-    // Save strictly to local device storage immediately
+    // Save strictly to local device storage only (DPDP compliant - Zero remote data collection)
     try {
       const updated = {
         isRegistered: true,
-        name: profileData.name || name,
-        parentName: profileData.parentName || parentName,
+        name: cleanName,
+        parentName: cleanParentName,
         parentConsent: profileData.parentConsent !== undefined ? profileData.parentConsent : parentConsent,
         medium: profileData.medium || medium,
         avatar: profileData.avatar || avatar,
@@ -251,33 +254,14 @@ export const GameProvider = ({ children }) => {
     } catch {
       // ignore
     }
-
-    // Save only anonymous telemetry/progress to cloud if parent logs in
-    if (auth?.currentUser && db) {
-      try {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(
-          userRef,
-          {
-            parentEmail: auth.currentUser.email || null,
-            parentName: profileData.parentName || parentName,
-            medium: profileData.medium || medium,
-            xp,
-            energy,
-            progress,
-            isParentVerified: true,
-            dpdpConsentDate: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-      } catch (e) {
-        console.warn('Sync notice:', e.message);
-      }
-    }
   };
 
   const updateGameState = async (updates) => {
-    if (auth?.currentUser && db) {
+    // Rate limit cloud writes (prevent high frequency API spam)
+    if (!checkRateLimit('firestore_sync', 2, 1000)) {
+      return;
+    }
+    if (auth?.currentUser?.uid && db) {
       try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await updateDoc(userRef, updates);
