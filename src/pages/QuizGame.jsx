@@ -12,13 +12,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import GearButton from '../components/GearButton';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
 import { getQuestionsForLevel } from '../data/questions';
 import { getAvatarEmoji } from '../data/avatars';
 import confetti from 'canvas-confetti';
 import { isHumanInteraction, checkRateLimit } from '../utils/security';
+import InteractiveQuestionRenderer from '../components/question_types/InteractiveQuestionRenderer';
 
 export default function QuizGame() {
   const { landId, levelId } = useParams();
@@ -143,10 +143,17 @@ export default function QuizGame() {
   // Auto-read question text when audio button clicked
   const handleReadQuestion = () => {
     if (!currentQuestion) return;
+    const textToRead =
+      currentQuestion.instruction ||
+      currentQuestion.prompt ||
+      currentQuestion.text ||
+      currentQuestion.sentence ||
+      currentQuestion.clue ||
+      '';
     if (useUKAudio) {
-      speakUKEnglish(currentQuestion.text);
+      speakUKEnglish(textToRead);
     } else {
-      speakMalayalam(currentQuestion.text);
+      speakMalayalam(textToRead);
     }
   };
 
@@ -173,27 +180,26 @@ export default function QuizGame() {
     setShowExplanation(true);
   };
 
-  const handleOptionClick = (optionId, event) => {
+  const handleAnswerSubmit = (isAnswerCorrect, userChoice, event) => {
     // Bot check: block synthetic / automated browser dispatch events
     if (event && !isHumanInteraction(event)) {
       return;
     }
 
-    // Rate limiting: throttle clicks (minimum 400ms cooldown)
-    if (!checkRateLimit('quiz_option_click', 1, 400)) {
+    // Rate limiting: throttle interactions
+    if (!checkRateLimit('quiz_answer_submit', 1, 300)) {
       return;
     }
 
     if (selectedOption || showExplanation) return;
 
-    setSelectedOption(optionId);
+    setSelectedOption(userChoice || 'answered');
     playSound('click');
 
-    const correct = optionId === currentQuestion.correct;
-    setIsCorrect(correct);
-    setResult(correct ? 'correct' : 'wrong');
+    setIsCorrect(isAnswerCorrect);
+    setResult(isAnswerCorrect ? 'correct' : 'wrong');
 
-    if (correct) {
+    if (isAnswerCorrect) {
       playSound('correct');
       const isFast = timeLeft >= 22;
       const xpAmount = isFast ? 15 : 10;
@@ -1049,24 +1055,20 @@ export default function QuizGame() {
             </button>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-candy-green text-center leading-relaxed drop-shadow-sm font-chembakam my-2">
-            {currentQuestion.text}
+          <h2 className="text-xl sm:text-2xl font-black text-candy-green text-center leading-relaxed drop-shadow-sm font-chembakam my-2">
+            {currentQuestion.instruction || currentQuestion.title || currentQuestion.text}
           </h2>
         </div>
 
-        {/* Options Grid */}
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full place-items-center relative">
-          {currentQuestion.options.map((option) => (
-            <GearButton
-              key={option.id}
-              option={option.id.toUpperCase()}
-              text={option.text}
-              isSelected={selectedOption === option.id}
-              result={selectedOption === option.id ? result : null}
-              onClick={(e) => handleOptionClick(option.id, e)}
-              disabled={!!selectedOption || showExplanation}
-            />
-          ))}
+        {/* Dynamic Multi-Format Interactive Question Engine */}
+        <div className="w-full relative">
+          <InteractiveQuestionRenderer
+            question={currentQuestion}
+            selectedOption={selectedOption}
+            result={result}
+            onAnswer={handleAnswerSubmit}
+            disabled={!!selectedOption || showExplanation}
+          />
 
           <AnimatePresence>
             {selectedOption && isCorrect && (
