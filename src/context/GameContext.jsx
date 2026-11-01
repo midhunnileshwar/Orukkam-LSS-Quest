@@ -11,6 +11,7 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { sanitizeText, checkRateLimit } from '../utils/security';
+import { subscribeToContentUpdates } from '../services/contentSync';
 
 const GameContext = createContext();
 
@@ -61,6 +62,18 @@ export const GameProvider = ({ children }) => {
   );
   const [avatar, setAvatar] = useState(localData.avatar || 'tiger');
   const [progress, setProgress] = useState(localData.progress || DEFAULT_PROGRESS);
+
+  // Real-Time Content Sync State (Instant reflection of teacher game updates)
+  const [contentVersion, setContentVersion] = useState(0);
+  const [lastContentUpdate, setLastContentUpdate] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToContentUpdates((update) => {
+      setContentVersion((v) => v + 1);
+      setLastContentUpdate(update);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Persist game state directly to this device's localStorage
   useEffect(() => {
@@ -365,6 +378,8 @@ export const GameProvider = ({ children }) => {
         avatar,
         setAvatar,
         progress,
+        contentVersion,
+        lastContentUpdate,
         addXp,
         completeLevel,
         updateLevelStatus,

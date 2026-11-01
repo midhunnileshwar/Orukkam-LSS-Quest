@@ -20,6 +20,7 @@ import {
   validateSheetUrl,
   sha256,
 } from '../utils/security';
+import { publishLevelUpdate } from '../services/contentSync';
 
 const SUBJECTS = [
   { id: 'maths', name: 'സംഖ്യാലോകം (Maths)' },
@@ -155,23 +156,21 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
     setSaveSuccess(false);
   };
 
-  const handleSaveToDatabase = () => {
+  const handleSaveToDatabase = async () => {
     if (parsedQuestions.length === 0) return;
 
     try {
-      const existingRaw = localStorage.getItem('orukkam_custom_questions');
-      const store = existingRaw ? JSON.parse(existingRaw) : {};
-
-      if (!store[targetLand]) store[targetLand] = {};
-      store[targetLand][targetLevel] = {
+      const levelPayload = {
         title: `അധ്യാപക ചോദ്യങ്ങൾ (Level ${targetLevel})`,
         questions: parsedQuestions,
       };
 
-      localStorage.setItem('orukkam_custom_questions', JSON.stringify(store));
+      // Broadcast and persist in real-time across all online student devices and sessions
+      await publishLevelUpdate(targetLand, targetLevel, levelPayload);
+
       setSaveSuccess(true);
       updateStoredCount();
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 4000);
     } catch (e) {
       alert('Error saving questions: ' + e.message);
     }
@@ -450,10 +449,13 @@ Expl: മഹാത്മാ ഗാന്ധിയാണ് രാഷ്ട്ര
                   </button>
 
                   {saveSuccess && (
-                    <div className="p-3 bg-green-900/80 border border-green-500 text-green-200 rounded-xl text-center font-bold flex items-center justify-center space-x-2">
-                      <CheckCircle size={18} />
-                      <span>
-                        ചോദ്യങ്ങൾ വിജയകരമായി സേവ് ചെയ്തു! വിദ്യാർത്ഥികൾക്ക് ഇപ്പോൾ കളിക്കാം.
+                    <div className="p-3.5 bg-green-900/90 border border-green-500 text-green-200 rounded-xl text-center font-bold flex flex-col items-center justify-center space-y-1 shadow-lg animate-fadeIn">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle size={18} className="text-green-400" />
+                        <span>ചോദ്യങ്ങൾ സേവ് ചെയ്യുകയും എല്ലാ വിദ്യാർത്ഥികൾക്കും തത്സമയം നൽകുകയും ചെയ്തു!</span>
+                      </div>
+                      <span className="text-xs text-green-300/90 font-normal">
+                        ⚡ Real-time broadcast pushed to all logged-in students across Kerala!
                       </span>
                     </div>
                   )}

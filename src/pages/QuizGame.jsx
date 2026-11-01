@@ -23,7 +23,17 @@ import { isHumanInteraction, checkRateLimit } from '../utils/security';
 export default function QuizGame() {
   const { landId, levelId } = useParams();
   const navigate = useNavigate();
-  const { addXp, energy, loseEnergy, refillEnergy, completeLevel, name, avatar, medium } = useGame();
+  const {
+    addXp,
+    energy,
+    loseEnergy,
+    refillEnergy,
+    completeLevel,
+    name,
+    avatar,
+    medium,
+    lastContentUpdate,
+  } = useGame();
   const { playSound, speakUKEnglish, speakMalayalam } = useSound();
 
   const isEnglish = medium === 'english';
@@ -60,6 +70,35 @@ export default function QuizGame() {
   const [totalXpGained, setTotalXpGained] = useState(0);
 
   const isDaily = landId === 'daily' || levelId === 'mix';
+
+  // Real-Time Content Sync State (alerts if teacher updates this level live)
+  const [liveUpdateAlert, setLiveUpdateAlert] = useState(false);
+
+  useEffect(() => {
+    if (!lastContentUpdate) return;
+    const isThisLevel =
+      lastContentUpdate.landId === landId &&
+      String(lastContentUpdate.levelId) === String(levelId);
+
+    if (isThisLevel) {
+      setLiveUpdateAlert(true);
+      playSound('pop');
+    }
+  }, [lastContentUpdate, landId, levelId]);
+
+  const handleReloadNewQuestions = () => {
+    const data = getQuestionsForLevel(landId, levelId, medium);
+    if (data) {
+      setLevelData(data);
+      setCurrentQuestionIndex(0);
+      setSelectedOption(null);
+      setShowExplanation(false);
+      setResult(null);
+      setTimeLeft(30);
+      setLiveUpdateAlert(false);
+      playSound('correct');
+    }
+  };
 
   useEffect(() => {
     const data = getQuestionsForLevel(landId, levelId, medium);
@@ -946,6 +985,51 @@ export default function QuizGame() {
 
       {/* Question Card */}
       <div className="flex-1 w-full max-w-lg px-4 py-2 flex flex-col justify-center relative z-10">
+        {/* Real-Time Teacher Update Notification Banner */}
+        <AnimatePresence>
+          {liveUpdateAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: -15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.95 }}
+              className="w-full bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-950 border-2 border-yellow-400 p-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 text-white mb-4 z-40"
+            >
+              <div className="flex items-center space-x-2.5">
+                <span className="text-2xl animate-bounce">📢</span>
+                <div>
+                  <p className="font-extrabold text-xs text-yellow-300">
+                    {isEnglish
+                      ? 'Teacher updated this level live!'
+                      : 'അധ്യാപകൻ പുതിയ ചോദ്യങ്ങൾ അപ്ഡേറ്റ് ചെയ്തു!'}
+                  </p>
+                  <p className="text-[11px] text-purple-200">
+                    {isEnglish
+                      ? 'Fresh questions are ready to play.'
+                      : 'പുതിയ ചോദ്യങ്ങൾ ഇപ്പോൾ തത്സമയം കളിക്കാം.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleReloadNewQuestions}
+                  className="bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black text-xs px-3 py-1.5 rounded-xl shadow active:scale-95 transition"
+                >
+                  {isEnglish ? 'Update ⚡' : 'മാറ്റുക ⚡'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLiveUpdateAlert(false)}
+                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white"
+                  aria-label="Dismiss"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="bg-slate-800 border-[6px] border-slate-600 rounded-[2rem] p-6 mb-6 shadow-2xl relative overflow-hidden transform rotate-0.5">
           <div className="absolute top-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
           <div className="absolute top-3 right-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>

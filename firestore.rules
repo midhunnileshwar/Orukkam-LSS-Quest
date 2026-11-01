@@ -33,6 +33,13 @@ service cloud.firestore {
       );
     }
 
+    // Real-Time Game Content & Levels Broadcasting
+    // Allows all students to read published levels live, and teachers to publish updates
+    match /game_content/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Default Deny Rule: Block all unauthorized collections and scans
     match /{document=**} {
       allow read, write: if false;
