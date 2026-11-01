@@ -29,3 +29,27 @@ body {
 .btn-cartoon {
   @apply transform transition-all active:translate-y-1 active:shadow-none;
 }
+
+/* Printable Worksheet Styles */
+@media print {
+  body {
+    background: white !important;
+    background-image: none !important;
+    color: black !important;
+  }
+
+  /* Hide normal game navigation & UI elements */
+  nav, button, .print\\:hidden {
+    display: none !important;
+  }
+
+  #printable-worksheet {
+    visibility: visible !important;
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+

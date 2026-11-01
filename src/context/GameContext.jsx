@@ -44,13 +44,21 @@ export const GameProvider = ({ children }) => {
   // Student Identity & Device Registration
   const [isRegistered, setIsRegistered] = useState(Boolean(localData.isRegistered));
   const [name, setName] = useState(localData.name || '');
-  const [district, setDistrict] = useState(localData.district || 'Kannur');
   const [parentName, setParentName] = useState(localData.parentName || '');
   const [parentConsent, setParentConsent] = useState(Boolean(localData.parentConsent));
+  // Medium of Learning ('malayalam' | 'english')
+  const [medium, setMedium] = useState(localData.medium || 'malayalam');
 
   // Game Progress
   const [xp, setXp] = useState(typeof localData.xp === 'number' ? localData.xp : 0);
-  const [hearts, setHearts] = useState(typeof localData.hearts === 'number' ? localData.hearts : 5);
+  // Energy points (Replacing hearts with energy ⚡)
+  const [energy, setEnergy] = useState(
+    typeof localData.energy === 'number'
+      ? localData.energy
+      : typeof localData.hearts === 'number'
+      ? localData.hearts
+      : 5
+  );
   const [avatar, setAvatar] = useState(localData.avatar || 'tiger');
   const [progress, setProgress] = useState(localData.progress || DEFAULT_PROGRESS);
 
@@ -60,11 +68,12 @@ export const GameProvider = ({ children }) => {
       const stateToSave = {
         isRegistered,
         name,
-        district,
         parentName,
         parentConsent,
+        medium,
         xp,
-        hearts,
+        energy,
+        hearts: energy,
         avatar,
         progress,
       };
@@ -72,7 +81,7 @@ export const GameProvider = ({ children }) => {
     } catch (e) {
       console.warn('Could not save to localStorage', e);
     }
-  }, [isRegistered, name, district, parentName, parentConsent, xp, hearts, avatar, progress]);
+  }, [isRegistered, name, parentName, parentConsent, medium, xp, energy, avatar, progress]);
 
   // Auth & Cloud Sync (Only for verified Parents/Teachers)
   useEffect(() => {
@@ -82,9 +91,14 @@ export const GameProvider = ({ children }) => {
     }, 2000);
 
     try {
+      if (!auth) {
+        setLoading(false);
+        return;
+      }
+
       unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         clearTimeout(safetyTimeout);
-        if (currentUser) {
+        if (currentUser && db) {
           const userRef = doc(db, 'users', currentUser.uid);
 
           const unsubscribeSnapshot = onSnapshot(
@@ -94,8 +108,9 @@ export const GameProvider = ({ children }) => {
                 const data = docSnap.data();
                 setUser({ ...currentUser, ...data });
                 if (data.parentName) setParentName(data.parentName);
+                if (data.medium) setMedium(data.medium);
                 if (typeof data.xp === 'number' && data.xp > xp) setXp(data.xp);
-                if (typeof data.hearts === 'number') setHearts(data.hearts);
+                if (typeof data.energy === 'number') setEnergy(data.energy);
                 if (data.avatar) setAvatar(data.avatar);
                 if (data.progress) setProgress(data.progress);
               } else {
@@ -131,6 +146,7 @@ export const GameProvider = ({ children }) => {
 
   const loginWithGoogle = async () => {
     try {
+      if (!auth || !googleProvider) throw new Error('Auth unavailable');
       const result = await signInWithPopup(auth, googleProvider);
       return { success: true, user: result.user };
     } catch (error) {
@@ -149,14 +165,17 @@ export const GameProvider = ({ children }) => {
 
   const playAsGuest = async () => {
     try {
-      const { signInAnonymously } = await import('firebase/auth');
-      const result = await signInAnonymously(auth);
-      return { success: true, user: result.user };
+      if (auth) {
+        const { signInAnonymously } = await import('firebase/auth');
+        const result = await signInAnonymously(auth);
+        return { success: true, user: result.user };
+      }
     } catch {
-      const mockGuest = { uid: 'guest-' + Date.now(), isAnonymous: true, isNew: false };
-      setUser(mockGuest);
-      return { success: true, user: mockGuest };
+      // Guest local fallback
     }
+    const mockGuest = { uid: 'guest-' + Date.now(), isAnonymous: true, isNew: false };
+    setUser(mockGuest);
+    return { success: true, user: mockGuest };
   };
 
   const registerWithEmail = async (email, password) => {
@@ -182,7 +201,7 @@ export const GameProvider = ({ children }) => {
   // Logout clears session and resets device game data
   const logout = async () => {
     try {
-      await signOut(auth);
+      if (auth) await signOut(auth);
     } catch {
       // ignore
     }
@@ -196,11 +215,11 @@ export const GameProvider = ({ children }) => {
     setUser(null);
     setIsRegistered(false);
     setName('');
-    setDistrict('Kannur');
     setParentName('');
     setParentConsent(false);
+    setMedium('malayalam');
     setXp(0);
-    setHearts(5);
+    setEnergy(5);
     setAvatar('tiger');
     setProgress(DEFAULT_PROGRESS);
   };
@@ -209,22 +228,23 @@ export const GameProvider = ({ children }) => {
   const saveProfile = async (profileData) => {
     setIsRegistered(true);
     if (profileData.name) setName(profileData.name);
-    if (profileData.district) setDistrict(profileData.district);
     if (profileData.avatar) setAvatar(profileData.avatar);
     if (profileData.parentName) setParentName(profileData.parentName);
     if (profileData.parentConsent !== undefined) setParentConsent(profileData.parentConsent);
+    if (profileData.medium) setMedium(profileData.medium);
 
     // Save strictly to local device storage immediately
     try {
       const updated = {
         isRegistered: true,
         name: profileData.name || name,
-        district: profileData.district || district,
         parentName: profileData.parentName || parentName,
         parentConsent: profileData.parentConsent !== undefined ? profileData.parentConsent : parentConsent,
+        medium: profileData.medium || medium,
         avatar: profileData.avatar || avatar,
         xp,
-        hearts,
+        energy,
+        hearts: energy,
         progress,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -233,7 +253,7 @@ export const GameProvider = ({ children }) => {
     }
 
     // Save only anonymous telemetry/progress to cloud if parent logs in
-    if (auth.currentUser) {
+    if (auth?.currentUser && db) {
       try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await setDoc(
@@ -241,9 +261,9 @@ export const GameProvider = ({ children }) => {
           {
             parentEmail: auth.currentUser.email || null,
             parentName: profileData.parentName || parentName,
-            district: profileData.district || district,
+            medium: profileData.medium || medium,
             xp,
-            hearts,
+            energy,
             progress,
             isParentVerified: true,
             dpdpConsentDate: new Date().toISOString(),
@@ -257,7 +277,7 @@ export const GameProvider = ({ children }) => {
   };
 
   const updateGameState = async (updates) => {
-    if (auth.currentUser) {
+    if (auth?.currentUser && db) {
       try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await updateDoc(userRef, updates);
@@ -273,15 +293,19 @@ export const GameProvider = ({ children }) => {
     updateGameState({ xp: newXp });
   };
 
-  const loseHeart = () => {
-    const newHearts = Math.max(0, hearts - 1);
-    setHearts(newHearts);
-    updateGameState({ hearts: newHearts });
+  // Energy mechanics: deduct 1 energy on wrong answer
+  const loseEnergy = () => {
+    setEnergy((prev) => {
+      const next = Math.max(0, prev - 1);
+      updateGameState({ energy: next });
+      return next;
+    });
   };
 
-  const refillHearts = () => {
-    setHearts(5);
-    updateGameState({ hearts: 5 });
+  // Energy mechanics: refill to maximum 5
+  const refillEnergy = () => {
+    setEnergy(5);
+    updateGameState({ energy: 5 });
   };
 
   const completeLevel = (landId, levelId) => {
@@ -341,20 +365,23 @@ export const GameProvider = ({ children }) => {
         isRegistered,
         name,
         setName,
-        district,
-        setDistrict,
         parentName,
         setParentName,
         parentConsent,
         setParentConsent,
+        medium,
+        setMedium,
         xp,
-        hearts,
+        energy,
+        hearts: energy, // Alias for backward compatibility
+        loseEnergy,
+        loseHeart: loseEnergy, // Alias for backward compatibility
+        refillEnergy,
+        refillHearts: refillEnergy, // Alias for backward compatibility
         avatar,
         setAvatar,
         progress,
         addXp,
-        loseHeart,
-        refillHearts,
         completeLevel,
         updateLevelStatus,
         getLevelStatus,

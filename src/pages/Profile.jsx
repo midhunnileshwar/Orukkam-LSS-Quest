@@ -1,20 +1,30 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, LogOut, Award } from 'lucide-react';
+import { ArrowLeft, Check, LogOut, Award, BookOpen } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
 import { AVATAR_LIST, AVATAR_MAP } from '../data/avatars';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { xp, avatar, saveProfile, name, logout } = useGame();
-  const { playSound } = useSound();
+  const { xp, avatar, saveProfile, name, medium, logout } = useGame();
+  const { playSound, speakMalayalam, speakUKEnglish } = useSound();
 
   const currentAvatar = AVATAR_MAP[avatar] || AVATAR_LIST[0];
 
   const handleSelectAvatar = (id) => {
     playSound('pop');
     saveProfile({ avatar: id });
+  };
+
+  const handleToggleMedium = (newMedium) => {
+    playSound('pop');
+    saveProfile({ medium: newMedium });
+    if (newMedium === 'english') {
+      speakUKEnglish('English medium selected.');
+    } else {
+      speakMalayalam('മലയാളം മീഡിയം തിരഞ്ഞെടുത്തു.');
+    }
   };
 
   const handleLogout = () => {
@@ -45,7 +55,7 @@ export default function Profile() {
       </div>
 
       {/* Profile Card */}
-      <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-cartoon-lg mb-8 border-4 border-white flex flex-col items-center relative overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-cartoon-lg mb-6 border-4 border-white flex flex-col items-center relative overflow-hidden">
         <div className="absolute top-0 w-full h-32 bg-gradient-to-b from-candy-blue/20 to-transparent"></div>
 
         <div className="w-32 h-32 rounded-full bg-candy-blue border-[6px] border-white shadow-lg flex items-center justify-center text-7xl mb-4 relative z-10">
@@ -80,6 +90,52 @@ export default function Profile() {
               Rank
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Medium of Learning Selection */}
+      <div className="bg-white rounded-[2rem] p-6 shadow-cartoon mb-6 border-4 border-white">
+        <div className="flex items-center space-x-2 mb-4">
+          <BookOpen className="text-indigo-600" size={24} />
+          <h3 className="text-xl font-black text-slate-800 font-chembakam">
+            പഠന മാധ്യമം (Medium of Learning)
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleToggleMedium('malayalam')}
+            className={`p-4 rounded-2xl border-4 font-black text-sm flex flex-col items-center transition-all ${
+              medium !== 'english'
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md ring-4 ring-emerald-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <span className="text-3xl mb-1">🌴</span>
+            <span>മലയാളം മീഡിയം</span>
+            {medium !== 'english' && (
+              <span className="text-xs font-bold text-emerald-600 mt-1 flex items-center">
+                <Check size={14} className="mr-0.5" /> Selected
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => handleToggleMedium('english')}
+            className={`p-4 rounded-2xl border-4 font-black text-sm flex flex-col items-center transition-all ${
+              medium === 'english'
+                ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-md ring-4 ring-indigo-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <span className="text-3xl mb-1">🇬🇧</span>
+            <span>English Medium</span>
+            {medium === 'english' && (
+              <span className="text-xs font-bold text-indigo-600 mt-1 flex items-center">
+                <Check size={14} className="mr-0.5" /> Selected
+              </span>
+            )}
+          </button>
         </div>
       </div>
 

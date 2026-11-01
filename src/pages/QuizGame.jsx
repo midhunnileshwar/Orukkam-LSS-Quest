@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Zap, Award, Volume2, RotateCcw } from 'lucide-react';
+import {
+  ArrowLeft,
+  Zap,
+  Volume2,
+  RotateCcw,
+  Printer,
+  X,
+  CheckCircle2,
+  BookOpen,
+  Sparkles,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GearButton from '../components/GearButton';
 import { useGame } from '../context/GameContext';
 import { useSound } from '../context/SoundContext';
 import { getQuestionsForLevel } from '../data/questions';
+import { getAvatarEmoji } from '../data/avatars';
 import confetti from 'canvas-confetti';
 
 export default function QuizGame() {
   const { landId, levelId } = useParams();
   const navigate = useNavigate();
-  const { addXp, loseHeart, refillHearts, hearts, completeLevel } = useGame();
-  const { playSound, speakText } = useSound();
+  const { addXp, energy, loseEnergy, refillEnergy, completeLevel, name, avatar, medium } = useGame();
+  const { playSound, speakUKEnglish, speakMalayalam } = useSound();
 
   const [levelData, setLevelData] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -24,18 +35,33 @@ export default function QuizGame() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [completed, setCompleted] = useState(false);
 
+  // Energy & Wrong Question Recovery
+  const [missedQuestions, setMissedQuestions] = useState([]);
+  const [recoveryIndex, setRecoveryIndex] = useState(0);
+  const [recoverySelectedOption, setRecoverySelectedOption] = useState(null);
+  const [recoveredCount, setRecoveredCount] = useState(0);
+
+  // Worksheet / PDF View
+  const [showWorksheet, setShowWorksheet] = useState(false);
+
   const [timeLeft, setTimeLeft] = useState(30);
   const [fastAnswerBonus, setFastAnswerBonus] = useState(false);
   const [earnedXp, setEarnedXp] = useState(0);
   const [totalXpGained, setTotalXpGained] = useState(0);
 
   const isDaily = landId === 'daily' || levelId === 'mix';
+  const isEnglishTent = landId === 'english';
+  // If subject is English tent OR student selected English Medium -> UK English feedback audio
+  const useUKEnglish = isEnglishTent || medium === 'english';
 
   useEffect(() => {
     const data = getQuestionsForLevel(landId, levelId);
     setLevelData(data);
     setCurrentQuestionIndex(0);
     setCompleted(false);
+    setMissedQuestions([]);
+    setRecoveryIndex(0);
+    setRecoveredCount(0);
   }, [landId, levelId]);
 
   // Timer Countdown
@@ -45,7 +71,7 @@ export default function QuizGame() {
       selectedOption ||
       completed ||
       showExplanation ||
-      hearts <= 0
+      energy <= 0
     )
       return;
 
@@ -61,21 +87,39 @@ export default function QuizGame() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation, hearts]);
+  }, [levelData, currentQuestionIndex, selectedOption, completed, showExplanation, energy]);
 
   const currentQuestion = levelData?.questions?.[currentQuestionIndex];
 
-  // Auto-read question text when first appearing
+  // Auto-read question text when audio button clicked
   const handleReadQuestion = () => {
-    if (currentQuestion) {
-      speakText(currentQuestion.text);
+    if (!currentQuestion) return;
+    if (useUKEnglish) {
+      speakUKEnglish(currentQuestion.text);
+    } else {
+      speakMalayalam(currentQuestion.text);
     }
   };
 
   const handleTimeOut = () => {
     playSound('wrong');
-    loseHeart();
-    speakText('സമയം കഴിഞ്ഞു! ഉത്തരം ശ്രദ്ധിക്കൂ.');
+    loseEnergy();
+
+    if (currentQuestion) {
+      setMissedQuestions((prev) => {
+        if (!prev.find((q) => q.id === currentQuestion.id)) {
+          return [...prev, currentQuestion];
+        }
+        return prev;
+      });
+    }
+
+    if (useUKEnglish) {
+      speakUKEnglish('Time is up! Let us see the right answer.');
+    } else {
+      speakMalayalam('സമയം കഴിഞ്ഞു! ഉത്തരം ശ്രദ്ധിക്കൂ.');
+    }
+
     setResult('wrong');
     setShowExplanation(true);
   };
@@ -99,14 +143,27 @@ export default function QuizGame() {
       setFastAnswerBonus(isFast);
       addXp(xpAmount);
 
-      const praises = [
-        'മിടുക്കൻ! ശരിയായ ഉത്തരം!',
-        'സൂപ്പർ! വളരെ നന്ന്!',
-        'അസ്സലായിരിക്കുന്നു!',
-        'ഗ്രേറ്റ് ജോബ്!',
-      ];
-      const randomPraise = praises[Math.floor(Math.random() * praises.length)];
-      speakText(randomPraise);
+      // Feedback Audio: strictly UK English for English Tent & English Medium, Malayalam otherwise
+      if (useUKEnglish) {
+        const ukPraises = [
+          'Splendid! Well done!',
+          'Brilliant! That is correct!',
+          'Marvellous work!',
+          'Outstanding! Keep it up!',
+          'Spot on! Excellent!',
+        ];
+        const randomPraise = ukPraises[Math.floor(Math.random() * ukPraises.length)];
+        speakUKEnglish(randomPraise);
+      } else {
+        const mlPraises = [
+          'മിടുക്കൻ! ശരിയായ ഉത്തരം!',
+          'സൂപ്പർ! വളരെ നന്ന്!',
+          'അസ്സലായിരിക്കുന്നു!',
+          'ഗ്രേറ്റ് ജോബ്!',
+        ];
+        const randomPraise = mlPraises[Math.floor(Math.random() * mlPraises.length)];
+        speakMalayalam(randomPraise);
+      }
 
       confetti({
         particleCount: 120,
@@ -119,10 +176,26 @@ export default function QuizGame() {
         nextQuestion();
       }, 1800);
     } else {
+      // Wrong answer
+      if (currentQuestion) {
+        setMissedQuestions((prev) => {
+          if (!prev.find((q) => q.id === currentQuestion.id)) {
+            return [...prev, currentQuestion];
+          }
+          return prev;
+        });
+      }
+
       setTimeout(() => {
         playSound('wrong');
-        loseHeart();
-        speakText('സാരമില്ല! നമുക്ക് ശരിയായ ഉത്തരം നോക്കാം.');
+        loseEnergy();
+
+        if (useUKEnglish) {
+          speakUKEnglish('Never mind! Let us check the correct answer.');
+        } else {
+          speakMalayalam('സാരമില്ല! നമുക്ക് ശരിയായ ഉത്തരം നോക്കാം.');
+        }
+
         setShowExplanation(true);
       }, 400);
     }
@@ -149,7 +222,15 @@ export default function QuizGame() {
         origin: { y: 0.4 },
         colors: ['#ffd700', '#ff00ff', '#00ffff', '#00ff00'],
       });
-      speakText('അഭിനന്ദനങ്ങൾ! നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!');
+
+      if (useUKEnglish) {
+        speakUKEnglish(
+          `Congratulations ${name || 'champion'}! You have successfully completed this level!`
+        );
+      } else {
+        speakMalayalam(`അഭിനന്ദനങ്ങൾ ${name || 'കൂട്ടുകാരാ'}! നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!`);
+      }
+
       completeLevel(landId, levelId);
     }
   };
@@ -162,74 +243,449 @@ export default function QuizGame() {
     }
   };
 
-  // Hearts exhausted screen
-  if (hearts <= 0) {
+  const handleGoToNextLevel = () => {
+    const nextLevel = parseInt(levelId) + 1;
+    if (nextLevel <= 10 && !isDaily) {
+      navigate(`/quiz/${landId}/${nextLevel}`);
+    } else {
+      handleReturnNavigation();
+    }
+  };
+
+  // --- RECOVERY MECHANIC: LEARN FROM WRONG ANSWERS TO RECHARGE ENERGY ---
+  const activeRecoveryQuestions =
+    missedQuestions.length > 0 ? missedQuestions : levelData?.questions ? [levelData.questions[0]] : [];
+  const activeRecoveryQuestion = activeRecoveryQuestions[recoveryIndex] || activeRecoveryQuestions[0];
+
+  const handleRecoveryOptionClick = (optionId) => {
+    if (recoverySelectedOption || !activeRecoveryQuestion) return;
+    setRecoverySelectedOption(optionId);
+
+    const isAnswerCorrect = optionId === activeRecoveryQuestion.correct;
+    if (isAnswerCorrect) {
+      playSound('energyRecharge');
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.5 },
+        colors: ['#fbbf24', '#38bdf8', '#4ade80'],
+      });
+
+      const nextRecovered = recoveredCount + 1;
+      setRecoveredCount(nextRecovered);
+
+      if (useUKEnglish) {
+        speakUKEnglish('Excellent! Energy recharged!');
+      } else {
+        speakMalayalam('മിടുക്കൻ! ഊർജ്ജം വീണ്ടെടുത്തു!');
+      }
+
+      setTimeout(() => {
+        setRecoverySelectedOption(null);
+        if (recoveryIndex < activeRecoveryQuestions.length - 1) {
+          setRecoveryIndex((prev) => prev + 1);
+        } else {
+          // All missed questions learned and retried! Refill to full 5/5
+          refillEnergy();
+          setMissedQuestions([]);
+          setRecoveryIndex(0);
+          setRecoveredCount(0);
+          setTimeLeft(30);
+          setShowExplanation(false);
+          setSelectedOption(null);
+          playSound('levelUp');
+        }
+      }, 1500);
+    } else {
+      playSound('wrong');
+      if (useUKEnglish) {
+        speakUKEnglish('Have a look at the hint and try again!');
+      } else {
+        speakMalayalam('സഹായക്കുറിപ്പ് നോക്കി ഒന്നുകൂടി ശ്രമിക്കൂ.');
+      }
+      setTimeout(() => {
+        setRecoverySelectedOption(null);
+      }, 1200);
+    }
+  };
+
+  const avatarEmoji = getAvatarEmoji(avatar);
+
+  // =========================================================================
+  // VIEW: ENERGY EXHAUSTED -> RECHARGE & LEARN SESSION
+  // =========================================================================
+  if (energy <= 0) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 text-white select-none relative overflow-hidden">
+        {/* Glowing electric background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-950/40 via-slate-950 to-slate-950 pointer-events-none" />
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-slate-800 border-4 border-candy-red p-8 rounded-[2.5rem] max-w-md shadow-2xl flex flex-col items-center"
+          className="bg-slate-900 border-4 border-amber-500 rounded-[2.5rem] max-w-lg w-full p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col items-center"
         >
-          <div className="text-7xl mb-4 animate-bounce">💔</div>
-          <h2 className="text-3xl font-black mb-2 text-candy-red">ഹൃദയങ്ങൾ തീർന്നു!</h2>
-          <p className="text-slate-300 text-lg mb-6 font-semibold">
-            വിഷമിക്കേണ്ട! ഒന്നു വിശ്രമിച്ച് നമുക്ക് വീണ്ടും തുടങ്ങാം.
+          {/* Energy Header */}
+          <div className="relative mb-3">
+            <div className="w-20 h-20 rounded-full bg-amber-500/20 border-4 border-amber-400 flex items-center justify-center text-4xl animate-bounce">
+              ⚡
+            </div>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-black text-amber-400 font-malayalam text-center mb-1">
+            ഊർജ്ജം വീണ്ടെടുക്കാം!
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300 font-bold text-center mb-5">
+            Recharge & Learn Challenge • ശരിയായ ഉത്തരം കണ്ടെത്തി ഊർജ്ജം വീണ്ടെടുക്കൂ!
           </p>
+
+          {/* Energy Bar Indicator */}
+          <div className="flex items-center space-x-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700 mb-6">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-1">
+              Energy:
+            </span>
+            {[...Array(5)].map((_, i) => (
+              <Zap
+                key={i}
+                size={22}
+                className={
+                  i < recoveredCount
+                    ? 'fill-amber-400 text-amber-400 animate-pulse'
+                    : 'text-slate-600'
+                }
+              />
+            ))}
+          </div>
+
+          {/* Missed Question Card */}
+          {activeRecoveryQuestion && (
+            <div className="w-full bg-slate-800/90 border-2 border-slate-700 rounded-2xl p-5 mb-5 shadow-inner">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-amber-400 bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-700">
+                  പഠന ചോദ്യം {recoveryIndex + 1}/{activeRecoveryQuestions.length}
+                </span>
+                <span className="text-xs text-slate-400 font-bold">ശരിയുത്തരം തൊടൂ 💡</span>
+              </div>
+
+              <h3 className="text-lg sm:text-xl font-black text-white mb-3 font-chembakam leading-relaxed">
+                {activeRecoveryQuestion.text}
+              </h3>
+
+              {/* Learning Hint */}
+              <div className="bg-amber-950/40 border-l-4 border-amber-400 p-3 rounded-r-xl mb-4 text-xs sm:text-sm text-amber-200">
+                <span className="font-bold">💡 പഠനക്കുറിപ്പ്: </span>
+                {activeRecoveryQuestion.explanation ||
+                  'ചോദ്യം ശ്രദ്ധയോടെ വായിച്ചുനോക്കി ശരിയായ ഉത്തരം തിരഞ്ഞെടുക്കൂ.'}
+              </div>
+
+              {/* Options */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {activeRecoveryQuestion.options.map((opt) => {
+                  const isChosen = recoverySelectedOption === opt.id;
+                  const isRightAnswer = opt.id === activeRecoveryQuestion.correct;
+                  let btnBg = 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600';
+
+                  if (isChosen) {
+                    btnBg = isRightAnswer
+                      ? 'bg-emerald-600 text-white border-emerald-400 scale-102'
+                      : 'bg-rose-600 text-white border-rose-400';
+                  }
+
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleRecoveryOptionClick(opt.id)}
+                      disabled={!!recoverySelectedOption}
+                      className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center space-x-2 text-left ${btnBg}`}
+                    >
+                      <span className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center text-xs flex-shrink-0">
+                        {opt.id.toUpperCase()}
+                      </span>
+                      <span className="line-clamp-2">{opt.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Quick full refill fallback button */}
           <button
             onClick={() => {
-              refillHearts();
+              refillEnergy();
+              setMissedQuestions([]);
               setTimeLeft(30);
               setShowExplanation(false);
               setSelectedOption(null);
-              playSound('click');
+              playSound('energyRecharge');
             }}
-            className="w-full bg-candy-green hover:bg-candy-green/90 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all flex items-center justify-center space-x-2"
+            className="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black py-3.5 px-6 rounded-2xl shadow-cartoon text-base active:translate-y-1 transition-all flex items-center justify-center space-x-2 border-2 border-white"
           >
-            <RotateCcw size={24} />
-            <span>ജീവൻ വീണ്ടെടുക്കൂ (Refill Hearts ❤️)</span>
+            <RotateCcw size={20} />
+            <span>മുഴുവൻ ഊർജ്ജവും നിറച്ച് തുടരുക (Full Recharge ⚡)</span>
           </button>
+
           <button
             onClick={handleReturnNavigation}
-            className="mt-4 text-slate-400 font-bold hover:text-white"
+            className="mt-4 text-slate-400 font-bold hover:text-white text-sm"
           >
-            തിരികെ പോകാം (Go Back)
+            ← തിരികെ മാപ്പിലേക്ക് (Return to Map)
           </button>
         </motion.div>
       </div>
     );
   }
 
-  // Victory / Completed Screen
+  // =========================================================================
+  // VIEW: LEVEL COMPLETED VICTORY SCREEN
+  // =========================================================================
   if (completed) {
-    return (
-      <div className="min-h-screen bg-candy-green flex flex-col items-center justify-center text-white relative overflow-hidden p-6 text-center">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', bounce: 0.5 }}
-          className="flex flex-col items-center max-w-md w-full"
-        >
-          <h1 className="text-6xl font-black mb-2 animate-bounce drop-shadow-lg">വിജയം! 🌟</h1>
-          <p className="text-xl font-bold mb-6 text-green-100">VICTORY!</p>
+    const nextLevel = parseInt(levelId) + 1;
+    const hasNextLevel = nextLevel <= 10 && !isDaily;
 
-          <div className="bg-white/20 p-8 rounded-[2.5rem] backdrop-blur-md border-4 border-white text-center w-full shadow-2xl mb-8">
-            <Award size={80} className="text-yellow-300 mx-auto mb-4 animate-pulse" />
-            <h3 className="text-3xl font-black mb-2">ലെവൽ പൂർത്തിയായി!</h3>
-            <p className="text-lg opacity-90 mb-4 font-semibold">Level {levelId} Finished</p>
-            <div className="bg-white/25 py-3 px-6 rounded-2xl inline-block border-2 border-white/50">
-              <span className="text-2xl font-black text-yellow-300">+{totalXpGained + 50} XP</span>
-              <span className="text-sm block text-white/80 font-bold">Total Bonus</span>
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white relative overflow-hidden p-4 sm:p-6 text-center select-none">
+        {/* Background rays */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-950/50 via-slate-950 to-slate-950 pointer-events-none" />
+
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', bounce: 0.4 }}
+          className="flex flex-col items-center max-w-md w-full relative z-10"
+        >
+          {/* Kid Avatar & Name Celebratory Card */}
+          <div className="relative mb-2">
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+              className="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 border-4 border-white shadow-2xl flex items-center justify-center text-6xl"
+            >
+              {avatarEmoji}
+            </motion.div>
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-400 text-slate-950 font-black text-xs px-3 py-0.5 rounded-full border border-amber-600 shadow-md whitespace-nowrap">
+              {name || 'കൂട്ടുകാരൻ'}
             </div>
           </div>
 
-          <button
-            onClick={handleReturnNavigation}
-            className="w-full bg-white text-candy-green font-black py-5 px-10 rounded-full shadow-cartoon text-2xl hover:scale-105 active:scale-95 transition-all border-4 border-white"
-          >
-            തുടരാം ➔ (Continue)
-          </button>
+          <h1 className="text-3xl sm:text-4xl font-black mb-1 font-chembakam text-yellow-300 drop-shadow-md">
+            അഭിനന്ദനങ്ങൾ {name || 'കൂട്ടുകാരാ'}! 🎉
+          </h1>
+          <p className="text-emerald-300 text-sm font-bold mb-5">
+            നിങ്ങൾ ഈ ലെവൽ വിജയകരമായി പൂർത്തിയാക്കി!
+          </p>
+
+          {/* XP & Door Animation Card */}
+          <div className="bg-slate-900/90 border-4 border-emerald-500/80 p-6 rounded-[2.5rem] backdrop-blur-md text-center w-full shadow-2xl mb-6 relative overflow-hidden">
+            {/* Animated Door to Next Level */}
+            <div className="mb-4 flex flex-col items-center">
+              <div
+                className="relative w-36 h-48 bg-amber-950 rounded-t-full border-4 border-amber-500 shadow-lg flex items-center justify-center overflow-hidden"
+                style={{ perspective: '600px' }}
+              >
+                {/* Glowing light inside */}
+                <div className="absolute inset-0 bg-gradient-to-t from-yellow-300 via-amber-400 to-yellow-100 flex flex-col items-center justify-center">
+                  <Sparkles size={36} className="text-amber-800 animate-spin-slow" />
+                  <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest mt-1">
+                    {hasNextLevel ? `Level ${nextLevel}` : 'Champion'}
+                  </span>
+                </div>
+
+                {/* Left Door */}
+                <motion.div
+                  initial={{ rotateY: 0 }}
+                  animate={{ rotateY: -100 }}
+                  transition={{ duration: 1, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
+                  style={{ transformOrigin: 'left center' }}
+                  className="absolute left-0 top-0 bottom-0 w-1/2 bg-amber-800 border-r border-amber-950 flex items-center justify-end pr-1"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow"></div>
+                </motion.div>
+
+                {/* Right Door */}
+                <motion.div
+                  initial={{ rotateY: 0 }}
+                  animate={{ rotateY: 100 }}
+                  transition={{ duration: 1, repeat: Infinity, repeatDelay: 2, ease: 'easeInOut' }}
+                  style={{ transformOrigin: 'right center' }}
+                  className="absolute right-0 top-0 bottom-0 w-1/2 bg-amber-800 border-l border-amber-950 flex items-center justify-start pl-1"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow"></div>
+                </motion.div>
+
+                {/* Walking Kid Avatar */}
+                <motion.div
+                  animate={{ scale: [1, 1.25, 0.4], opacity: [1, 1, 0] }}
+                  transition={{ duration: 1, repeat: Infinity, repeatDelay: 2, ease: 'easeIn' }}
+                  className="z-20 text-4xl"
+                >
+                  {avatarEmoji}
+                </motion.div>
+              </div>
+
+              <span className="text-xs font-black text-amber-300 mt-2 flex items-center space-x-1">
+                <span>🚪 അടുത്ത ലെവലിലേക്ക് വാതിൽ തുറക്കുന്നു...</span>
+              </span>
+            </div>
+
+            <div className="bg-emerald-950/60 py-2.5 px-6 rounded-2xl inline-block border-2 border-emerald-500/50">
+              <span className="text-2xl font-black text-yellow-300">+{totalXpGained + 50} XP</span>
+              <span className="text-xs block text-emerald-200 font-bold">Total Bonus</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 w-full">
+            {hasNextLevel ? (
+              <button
+                onClick={handleGoToNextLevel}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all border-2 border-white flex items-center justify-center space-x-2"
+              >
+                <span>അടുത്ത ലെവലിലേക്ക് (Next Level {nextLevel})</span>
+                <span className="text-2xl">➔</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleReturnNavigation}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-black py-4 px-6 rounded-2xl shadow-cartoon text-xl active:translate-y-1 transition-all border-2 border-white"
+              >
+                മാപ്പിലേക്ക് തിരികെ പോകാം ➔
+              </button>
+            )}
+
+            {/* WHAT I HAVE LEARNED / REVISION WORKSHEET PDF BUTTON */}
+            <button
+              onClick={() => setShowWorksheet(true)}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 px-6 rounded-2xl shadow-cartoon text-base active:translate-y-1 transition-all border-2 border-indigo-300 flex items-center justify-center space-x-2"
+            >
+              <BookOpen size={20} />
+              <span>
+                {useUKEnglish
+                  ? 'What I Have Learned (PDF / Print) 📄'
+                  : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ (PDF / Print) 📄'}
+              </span>
+            </button>
+
+            {hasNextLevel && (
+              <button
+                onClick={handleReturnNavigation}
+                className="text-slate-400 hover:text-white font-bold text-sm pt-1"
+              >
+                മാപ്പിലേക്ക് തിരികെ പോകാം (Back to Map)
+              </button>
+            )}
+          </div>
         </motion.div>
+
+        {/* =========================================================================
+            WORKSHEET / REVISION SHEET MODAL WITH PRINT & SAVE PDF
+           ========================================================================= */}
+        <AnimatePresence>
+          {showWorksheet && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+            >
+              <div className="bg-white text-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border-4 border-indigo-500">
+                {/* Modal Header (Hidden on Print) */}
+                <div className="p-4 bg-indigo-600 text-white flex items-center justify-between print:hidden">
+                  <div className="flex items-center space-x-2">
+                    <BookOpen size={22} />
+                    <span className="font-black text-lg">
+                      {useUKEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="bg-yellow-400 hover:bg-yellow-300 text-slate-900 px-4 py-2 rounded-xl font-black text-xs flex items-center space-x-1.5 shadow transition"
+                    >
+                      <Printer size={16} />
+                      <span>പ്രിന്റ് / സേവ് PDF</span>
+                    </button>
+                    <button
+                      onClick={() => setShowWorksheet(false)}
+                      className="p-2 hover:bg-white/20 rounded-full transition"
+                    >
+                      <X size={22} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Printable Document Body */}
+                <div id="printable-worksheet" className="p-6 sm:p-8 overflow-y-auto space-y-6">
+                  {/* Worksheet Header */}
+                  <div className="border-b-4 border-indigo-600 pb-4 text-center">
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1 font-bold">
+                      <span>LSS Quest • Kerala Primary Learning</span>
+                      <span>{new Date().toLocaleDateString()}</span>
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-black text-indigo-700">
+                      {useUKEnglish ? 'What I Have Learned' : 'ഞാൻ പഠിച്ച കാര്യങ്ങൾ'}
+                    </h2>
+                    <p className="text-sm font-bold text-slate-600 mt-1">
+                      {levelData?.title || `Level ${levelId}`} • {isEnglishTent ? 'English Tent' : landId}
+                    </p>
+
+                    <div className="mt-3 flex items-center justify-center space-x-4 bg-indigo-50 p-2 rounded-xl text-xs sm:text-sm font-bold text-indigo-950">
+                      <span>👤 {useUKEnglish ? 'Student' : 'വിദ്യാർത്ഥി'}: {name || 'LSS Scholar'}</span>
+                      <span>⭐ XP: {totalXpGained + 50}</span>
+                      <span>🛡️ Status: Completed</span>
+                    </div>
+                  </div>
+
+                  {/* Question and Answers List */}
+                  <div className="space-y-4">
+                    {levelData?.questions?.map((q, idx) => {
+                      const correctOpt = q.options.find((o) => o.id === q.correct);
+                      return (
+                        <div
+                          key={q.id || idx}
+                          className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 page-break-inside-avoid"
+                        >
+                          <div className="flex items-start space-x-2 mb-2">
+                            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <h4 className="font-black text-slate-800 text-sm sm:text-base leading-snug">
+                              {q.text}
+                            </h4>
+                          </div>
+
+                          <div className="ml-8 space-y-1.5">
+                            <div className="flex items-center space-x-2 text-emerald-700 font-black text-xs sm:text-sm bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+                              <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                              <span>
+                                {useUKEnglish ? 'Correct Answer: ' : 'ശരിയായ ഉത്തരം: '}
+                                {correctOpt?.text || q.correct}
+                              </span>
+                            </div>
+
+                            {q.explanation && (
+                              <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed font-semibold">
+                                <span className="font-bold text-indigo-600">
+                                  {useUKEnglish ? 'Learning Note: ' : 'പഠനക്കുറിപ്പ്: '}
+                                </span>
+                                {q.explanation}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Safety & Compliance Footer */}
+                  <div className="border-t-2 border-slate-200 pt-4 text-center text-[10px] text-slate-400">
+                    Generated locally on student device • DPDP Act 2023 Compliant • Orukkam LSS Quest
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -261,6 +717,9 @@ export default function QuizGame() {
     );
   }
 
+  // =========================================================================
+  // NORMAL QUIZ GAME VIEW
+  // =========================================================================
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center relative overflow-hidden select-none">
       {/* Background Patterns */}
@@ -272,7 +731,7 @@ export default function QuizGame() {
         }}
       />
 
-      {/* Top Bar */}
+      {/* Top Bar with Energy Bolts (⚡) instead of Hearts */}
       <div className="w-full p-4 flex justify-between items-center text-white z-10 relative max-w-2xl">
         <button
           onClick={handleReturnNavigation}
@@ -282,14 +741,17 @@ export default function QuizGame() {
           <ArrowLeft size={28} />
         </button>
 
-        {/* Hearts */}
-        <div className="flex space-x-1.5 bg-black/40 px-3 py-2 rounded-full border border-white/20">
+        {/* ⚡ ENERGY BOLTS (Replacing Hearts) */}
+        <div className="flex items-center space-x-1.5 bg-black/50 px-3 py-2 rounded-full border border-amber-400/40 shadow-inner">
+          <span className="text-xs font-black text-amber-300 mr-1 hidden sm:inline">ENERGY</span>
           {[...Array(5)].map((_, i) => (
-            <Heart
+            <Zap
               key={i}
               size={24}
               className={`filter drop-shadow-md transition-all ${
-                i < hearts ? 'fill-candy-red text-candy-red scale-100' : 'text-slate-600 scale-90'
+                i < energy
+                  ? 'fill-amber-400 text-amber-400 scale-100 animate-pulse'
+                  : 'text-slate-600 scale-90'
               }`}
             />
           ))}
@@ -313,7 +775,7 @@ export default function QuizGame() {
       {/* Question Card (The Machine Screen) */}
       <div className="flex-1 w-full max-w-lg px-4 py-2 flex flex-col justify-center relative z-10">
         <div className="bg-slate-800 border-[6px] border-slate-600 rounded-[2rem] p-6 mb-6 shadow-2xl relative overflow-hidden transform rotate-0.5">
-          {/* Bolts */}
+          {/* Machine Bolts */}
           <div className="absolute top-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
           <div className="absolute top-3 right-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
           <div className="absolute bottom-3 left-3 w-3 h-3 bg-slate-500 rounded-full shadow-inner border border-slate-700"></div>
@@ -328,7 +790,7 @@ export default function QuizGame() {
               className="flex items-center space-x-1 bg-indigo-600/80 hover:bg-indigo-500 text-white px-3 py-1 rounded-full text-xs font-bold active:scale-95 transition"
             >
               <Volume2 size={16} />
-              <span>വായിക്കാം</span>
+              <span>{useUKEnglish ? 'Listen' : 'വായിക്കാം'}</span>
             </button>
           </div>
 
@@ -390,12 +852,16 @@ export default function QuizGame() {
 
             <div className="flex items-center space-x-3 mb-3">
               <Zap className="text-candy-red fill-current animate-pulse" size={28} />
-              <h3 className="text-2xl font-black text-slate-800">ശരിയായ ഉത്തരം നോക്കാം! 💡</h3>
+              <h3 className="text-2xl font-black text-slate-800">
+                {useUKEnglish ? 'Let us check the answer! 💡' : 'ശരിയായ ഉത്തരം നോക്കാം! 💡'}
+              </h3>
             </div>
 
             <p className="text-slate-700 text-base sm:text-lg font-bold mb-6 leading-relaxed bg-red-50 p-4 rounded-2xl border-l-4 border-candy-red">
               {currentQuestion.explanation ||
-                'ശ്രമിച്ചത് നല്ല കാര്യം! അടുത്ത ചോദ്യത്തിൽ കൂടുതൽ ശ്രദ്ധിക്കാം.'}
+                (useUKEnglish
+                  ? 'Good try! Keep going for the next question.'
+                  : 'ശ്രമിച്ചത് നല്ല കാര്യം! അടുത്ത ചോദ്യത്തിൽ കൂടുതൽ ശ്രദ്ധിക്കാം.')}
             </p>
 
             <button

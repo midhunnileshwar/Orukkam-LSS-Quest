@@ -6,7 +6,23 @@ export const useSound = () => useContext(SoundContext);
 
 export const SoundProvider = ({ children }) => {
   const [isMuted, setIsMuted] = useState(() => localStorage.getItem('orukkam_muted') === 'true');
+  const [voices, setVoices] = useState([]);
   const audioCtxRef = useRef(null);
+
+  // Load available speech synthesis voices
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      const updateVoices = () => {
+        const available = window.speechSynthesis.getVoices();
+        if (available && available.length > 0) {
+          setVoices(available);
+        }
+      };
+
+      updateVoices();
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, []);
 
   // Initialize Audio Context on user interaction
   const initAudio = () => {
@@ -32,26 +48,54 @@ export const SoundProvider = ({ children }) => {
     }
   }, [isMuted]);
 
-  // Web Speech API Malayalam TTS Helper
+  // Speech Helper supporting UK English and Malayalam
   const speakText = (text, lang = 'ml-IN') => {
-    if (isMuted || !('speechSynthesis' in window)) return;
+    if (isMuted || !('speechSynthesis' in window) || !text) return;
     try {
-      window.speechSynthesis.cancel(); // Stop any pending speech
+      window.speechSynthesis.cancel(); // Stop pending speech
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
-      utterance.rate = 0.95; // Slightly slower, child-friendly pace
-      utterance.pitch = 1.1; // Friendly warm pitch
+      utterance.rate = 0.95; // Child-friendly clear pace
+      utterance.pitch = 1.05;
 
-      // Attempt Malayalam voice selection if available
-      const voices = window.speechSynthesis.getVoices();
-      const mlVoice = voices.find((v) => v.lang.includes('ml') || v.lang.includes('ML'));
-      if (mlVoice) utterance.voice = mlVoice;
+      const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
+
+      if (lang.toLowerCase().includes('en')) {
+        // Search for UK English voice
+        const ukVoice =
+          currentVoices.find(
+            (v) =>
+              (v.lang === 'en-GB' || v.lang === 'en_GB') &&
+              (v.name.includes('UK') || v.name.includes('United Kingdom') || !v.name.includes('US'))
+          ) ||
+          currentVoices.find(
+            (v) =>
+              v.lang.includes('GB') ||
+              v.name.includes('UK') ||
+              v.name.includes('United Kingdom') ||
+              v.name.includes('George') ||
+              v.name.includes('Hazel') ||
+              v.name.includes('Susan')
+          ) ||
+          currentVoices.find((v) => v.lang.startsWith('en'));
+
+        if (ukVoice) utterance.voice = ukVoice;
+      } else if (lang.toLowerCase().includes('ml')) {
+        // Search for Malayalam voice
+        const mlVoice = currentVoices.find(
+          (v) => v.lang.includes('ml') || v.lang.includes('ML') || v.name.toLowerCase().includes('malayalam')
+        );
+        if (mlVoice) utterance.voice = mlVoice;
+      }
 
       window.speechSynthesis.speak(utterance);
     } catch (e) {
       console.warn('TTS notice:', e);
     }
   };
+
+  const speakMalayalam = (text) => speakText(text, 'ml-IN');
+  const speakUKEnglish = (text) => speakText(text, 'en-GB');
 
   // Helper for chords/sequences
   const playNote = (ctx, freq, time, duration, type = 'sine') => {
@@ -116,6 +160,25 @@ export const SoundProvider = ({ children }) => {
           break;
         }
 
+        case 'doorOpen': {
+          // Magical door opening sound (mystic sweeping chime)
+          playNote(ctx, 392.0, now, 0.2, 'sine'); // G4
+          playNote(ctx, 523.25, now + 0.1, 0.25, 'triangle'); // C5
+          playNote(ctx, 659.25, now + 0.2, 0.3, 'sine'); // E5
+          playNote(ctx, 783.99, now + 0.3, 0.45, 'triangle'); // G5
+          playNote(ctx, 1046.5, now + 0.4, 0.6, 'sine'); // C6
+          break;
+        }
+
+        case 'energyRecharge': {
+          // Electric energetic power-up chime
+          playNote(ctx, 300, now, 0.1, 'sawtooth');
+          playNote(ctx, 450, now + 0.08, 0.1, 'sine');
+          playNote(ctx, 600, now + 0.16, 0.15, 'triangle');
+          playNote(ctx, 800, now + 0.25, 0.35, 'sine');
+          break;
+        }
+
         case 'correct': {
           // Cheerful rising major chime
           playNote(ctx, 523.25, now, 0.1, 'sine'); // C5
@@ -158,7 +221,7 @@ export const SoundProvider = ({ children }) => {
   };
 
   return (
-    <SoundContext.Provider value={{ isMuted, setIsMuted, playSound, speakText }}>
+    <SoundContext.Provider value={{ isMuted, setIsMuted, playSound, speakText, speakMalayalam, speakUKEnglish }}>
       {children}
     </SoundContext.Provider>
   );

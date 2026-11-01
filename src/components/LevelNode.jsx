@@ -2,15 +2,30 @@ import React from 'react';
 import { Star, Lock, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function LevelNode({ level, status, onPlay }) {
+export default function LevelNode({ level, status, onPlay, hasAvatar, avatarEmoji, avatarName }) {
   const isLocked = status === 'locked';
   const isCompleted = status === 'completed';
   const isCurrent = status === 'current';
 
   return (
     <div className="relative flex flex-col items-center group">
+      {/* Avatar Badge on active / current level */}
+      {hasAvatar && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: [0, -8, 0], opacity: 1 }}
+          transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+          className="absolute -top-14 z-20 flex flex-col items-center pointer-events-none"
+        >
+          <div className="text-4xl drop-shadow-lg filter">{avatarEmoji || '🐯'}</div>
+          <div className="bg-yellow-400 text-slate-900 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-md -mt-1 border border-yellow-500 whitespace-nowrap">
+            {avatarName || 'ഞാൻ'}
+          </div>
+        </motion.div>
+      )}
+
       {/* Stars Pop-up */}
-      {isCompleted && (
+      {isCompleted && !hasAvatar && (
         <div className="flex space-x-1 mb-1 absolute -top-8 animate-bounce-gentle">
           {[1, 2, 3].map((s) => (
             <Star key={s} size={20} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" />
@@ -24,11 +39,11 @@ export default function LevelNode({ level, status, onPlay }) {
         whileTap={!isLocked ? { scale: 0.9 } : { x: [0, -5, 5, -5, 5, 0] }}
         onClick={() => !isLocked && onPlay(level)}
         className={`
-          w-24 h-24 rounded-[2rem] flex items-center justify-center shadow-cartoon-sm border-[6px] transition-all
+          w-24 h-24 rounded-[2rem] flex items-center justify-center shadow-cartoon-sm border-[6px] transition-all relative
           ${isCompleted ? 'bg-candy-yellow border-white text-white' : ''}
           ${
             isCurrent
-              ? 'bg-candy-green border-white text-white animate-pulse-slow ring-4 ring-green-200'
+              ? 'bg-candy-green border-white text-white animate-pulse-slow ring-4 ring-green-200 shadow-xl'
               : ''
           }
           ${isLocked ? 'bg-slate-200 border-slate-300 text-slate-400' : ''}
